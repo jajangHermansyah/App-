@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+   
+<title>3D Model Viewer Pro</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+background:#ffffff;
+font-family:sans-serif;
+}
+
+/* UI */
+#ui{
+position:absolute;
+top:10px;
+left:10px;
+z-index:999;
+background:rgba(0,0,0,0.75);
+padding:8px;
+border-radius:8px;
+color:white;
+border:1px solid #444;
+}
+
+.btn-row{
+display:flex;
+gap:6px;
+}
+
+.btn-row button{
+flex:1;
+padding:6px;
+font-size:12px;
+border:none;
+border-radius:4px;
+background:#007bff;
+color:white;
+cursor:pointer;
+}
+
+button.active{ background:#28a745; }
+button:disabled{ background:#555; cursor:not-allowed; }
+
+.status{
+font-size:11px;
+margin-top:5px;
+color:#aaa;
+}
+
+/* Drag area */
+#dropZone{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.3);
+color:white;
+display:none;
+align-items:center;
+justify-content:center;
+font-size:20px;
+z-index:998;
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+    <div class="btn-row">
+        <button id="btnLoad">📁</button>
+        <button id="toggleWireframe">📐</button>
+        <button id="isoView">🎥</button>
+        <button id="bgColorBtn">🎨</button>
+    </div>
+    
+
+    <input type="file" id="fileInput" multiple accept=".obj,.mtl,.png,.jpg,.jpeg,.fbx,.gltf,.glb,.stl" hidden>
+    <input type="color" id="bgColorInput" value="#1a1a1a" hidden>
+</div>
+
+<div id="dropZone">Lepaskan file di sini</div>
+
+<script type="importmap">
+{
+"imports":{
+"three":"https://unpkg.com/three@0.160.0/build/three.module.js",
+"three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"
+}
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import {OBJLoader} from "three/addons/loaders/OBJLoader.js";
+import {MTLLoader} from "three/addons/loaders/MTLLoader.js";
+import {FBXLoader} from "three/addons/loaders/FBXLoader.js";
+import {GLTFLoader} from "three/addons/loaders/GLTFLoader.js";
+import {STLLoader} from "three/addons/loaders/STLLoader.js";
+import {OrbitControls} from "three/addons/controls/OrbitControls.js";
+
+/* SCENE */
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a1a);
+
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+
+let renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+/* LIGHT */
+scene.add(new THREE.AmbientLight(0xffffff,1.2));
+let dir = new THREE.DirectionalLight(0xffffff,1.5);
+dir.position.set(5,10,7);
+scene.add(dir);
+
+/* CONTROL */
+let controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+camera.position.set(0,2,5);
+
+/* STATE */
+let currentModel = null;
+let isWireframe = false;
+
+/* LOADER */
+const loaderOBJ = new OBJLoader();
+const loaderMTL = new MTLLoader();
+const loaderFBX = new FBXLoader();
+const loaderGLTF = new GLTFLoader();
+const loaderSTL = new STLLoader();
+
+/* UI */
+const fileInput = document.getElementById("fileInput");
+
+const wireBtn = document.getElementById("toggleWireframe");
+const btnLoad = document.getElementById("btnLoad");
+const isoBtn = document.getElementById("isoView");
+const dropZone = document.getElementById("dropZone");
+const bgBtn = document.getElementById("bgColorBtn");
+const bgInput = document.getElementById("bgColorInput");
+
+wireBtn.disabled = true;
+
+/* ================= BUTTON ================= */
+
+// LOAD
+btnLoad.onclick = () => fileInput.click();
+
+// ISO VIEW
+isoBtn.onclick = () => {
+
+    const direction = new THREE.Vector3(1, 1, 1).normalize();
+    const distance = camera.position.distanceTo(controls.target);
+    const targetPos = direction.multiplyScalar(distance).add(controls.target);
+
+    // animasi sederhana
+    let t = 0;
+
+    function animateCam(){
+        if(t < 1){
+            t += 0.05;
+            camera.position.lerp(targetPos, t);
+            controls.update();
+            requestAnimationFrame(animateCam);
+        }
+    }
+
+    animateCam();
+};
+// WIREFRAME
+wireBtn.onclick = () => {
+    if(!currentModel) return;
+    isWireframe = !isWireframe;
+
+    currentModel.traverse(c=>{
+        if(c.isMesh){
+            let mats = Array.isArray(c.material)?c.material:[c.material];
+            mats.forEach(m=>m.wireframe=isWireframe);
+        }
+    });
+
+    wireBtn.classList.toggle("active");
+};
+
+// BACKGROUND COLOR
+bgBtn.onclick = () => bgInput.click();
+
+bgInput.addEventListener("input", () => {
+    scene.background = new THREE.Color(bgInput.value);
+    bgBtn.classList.add("active");
+});
+
+/* ================= LOAD ================= */
+
+fileInput.addEventListener("change", e=>{
+    handleFiles(e.target.files);
+});
+
+/* DRAG DROP */
+window.addEventListener("dragover", e=>{
+    e.preventDefault();
+    dropZone.style.display = "flex";
+});
+
+window.addEventListener("dragleave", ()=>{
+    dropZone.style.display = "none";
+});
+
+window.addEventListener("drop", e=>{
+    e.preventDefault();
+    dropZone.style.display = "none";
+    handleFiles(e.dataTransfer.files);
+});
+
+function handleFiles(files){
+    let modelFile=null, mtlFile=null, textures={};
+
+    for(let f of files){
+        let name = f.name.toLowerCase();
+        if(name.match(/\.(obj|fbx|gltf|glb|stl)$/)) modelFile=f;
+        if(name.endsWith(".mtl")) mtlFile=f;
+        if(name.match(/\.(png|jpg|jpeg)$/)) textures[f.name]=URL.createObjectURL(f);
+    }
+
+    if(!modelFile){
+    return;
+}
+
+let ext = modelFile.name.split(".").pop().toLowerCase();
+let reader = new FileReader();
+
+    reader.onload = ev=>{
+        if(currentModel) scene.remove(currentModel);
+
+        if(ext==="obj"){
+            if(mtlFile){
+                let mtlReader=new FileReader();
+                mtlReader.onload = m=>{
+                    let text=m.target.result;
+                    for(let t in textures) text=text.replaceAll(t,textures[t]);
+                    let materials=loaderMTL.parse(text);
+                    materials.preload();
+                    loaderOBJ.setMaterials(materials);
+                    tampilkanModel(loaderOBJ.parse(ev.target.result));
+                };
+                mtlReader.readAsText(mtlFile);
+            } else tampilkanModel(loaderOBJ.parse(ev.target.result));
+        }
+
+        if(ext==="fbx") tampilkanModel(loaderFBX.parse(ev.target.result));
+
+        if(ext==="gltf"||ext==="glb"){
+            loaderGLTF.parse(ev.target.result,"",g=>tampilkanModel(g.scene));
+        }
+
+        if(ext==="stl"){
+            let geo=loaderSTL.parse(ev.target.result);
+            tampilkanModel(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xccc})));
+        }
+    };
+
+    if(ext==="obj") reader.readAsText(modelFile);
+    else reader.readAsArrayBuffer(modelFile);
+}
+
+/* ================= SHOW MODEL ================= */
+
+function tampilkanModel(object){
+
+    object.traverse(c=>{
+        if(c.isMesh){
+            let mats = Array.isArray(c.material)?c.material:[c.material];
+            mats.forEach(m=>{
+                if(m.map){
+                    m.transparent=true;
+                    m.alphaTest=0.05;
+                    m.side=THREE.DoubleSide;
+                }
+            });
+        }
+    });
+
+    let box=new THREE.Box3().setFromObject(object);
+    let size=box.getSize(new THREE.Vector3());
+    let center=box.getCenter(new THREE.Vector3());
+
+    object.position.sub(center);
+
+    let maxDim=Math.max(size.x,size.y,size.z);
+    let camZ=maxDim*1.5;
+
+    camera.position.set(camZ,camZ,camZ);
+    controls.target.set(0,0,0);
+    controls.update();
+
+    scene.add(object);
+    currentModel=object;
+
+    wireBtn.disabled=false;
+    statusText.innerText="Model berhasil!";
+}
+
+/* LOOP */
+function animate(){
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene,camera);
+}
+animate();
+
+/* RESIZE */
+window.addEventListener("resize",()=>{
+    camera.aspect=window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
+
+</body>
+</html>
