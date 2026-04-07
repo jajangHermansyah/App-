@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="style.css?v=1.0">
     
      <!-- ICON -->
-<link rel="icon" href="icon.png">
+<link rel="icon" href="icon.jpg">
 <link rel="apple-touch-icon" href="icon.png">
 
 <!-- PWA -->
@@ -126,6 +126,16 @@ if ('serviceWorker' in navigator) {
   });
         }
 </script>
+    <script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+  .then(function(reg){
+    console.log("Service Worker aktif", reg);
+  }).catch(function(err){
+    console.log("Service Worker gagal", err);
+  });
+        }
+    </script>
 
 </body>
 </html>
