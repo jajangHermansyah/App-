@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+<title>Terrain 3D - Sculpt & Paint</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        overflow: hidden;
+        background: #0a0a20;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        touch-action: none;
+        height: 100%;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    canvas { display: block; }
+
+    #gearBtn {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        width: 46px; height: 46px;
+        border-radius: 50%;
+        background: rgba(20,20,30,0.85);
+        color: white; font-size: 22px;
+        border: 1px solid rgba(255,255,255,0.2);
+        cursor: pointer; z-index: 30;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+    #gearBtn:active { transform: scale(0.92); }
+
+    #modeBar {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 6px;
+        background: rgba(20,20,30,0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        padding: 5px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.15);
+        z-index: 30;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+    #modeBar button {
+        padding: 8px 16px;
+        border-radius: 10px;
+        border: none;
+        background: transparent;
+        color: #ccc;
+        font-size: 13px;
+        cursor: pointer;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.15s;
+    }
+    #modeBar button.active {
+        background: #4facfe;
+        color: #001;
+        font-weight: bold;
+        box-shadow: 0 0 12px rgba(79,172,254,0.5);
+    }
+    #modeBar button:active { transform: scale(0.95); }
+
+    #panel {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 70px);
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        background: rgba(20,20,30,0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 14px;
+        padding: 15px;
+        color: white;
+        display: none;
+        z-index: 30;
+        border: 1px solid rgba(255,255,255,0.15);
+        width: min(260px, calc(100vw - 24px));
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+    }
+    #panel.show { display: block; }
+    #panel h3 {
+        font-size: 11px;
+        margin-bottom: 8px;
+        margin-top: 4px;
+        opacity: 0.65;
+        font-weight: 600;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+    }
+    #panel h3:first-child { margin-top: 0; }
+
+    .mode-btns {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+    .mode-btns button {
+        flex: 1;
+        padding: 8px 0;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.2);
+        background: rgba(255,255,255,0.05);
+        color: white;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .mode-btns button.active {
+        background: #4facfe;
+        border-color: #4facfe;
+        color: #001;
+        font-weight: bold;
+    }
+    .mode-btns button[data-dir="smooth"].active {
+        background: #ffc83d;
+        border-color: #ffc83d;
+    }
+
+    #panel label {
+        font-size: 12px;
+        opacity: 0.8;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+    }
+    #panel label .val {
+        color: #4facfe;
+        font-weight: 600;
+    }
+    #panel input[type=range] {
+        width: 100%;
+        accent-color: #4facfe;
+        margin-bottom: 10px;
+    }
+
+    .divider {
+        height: 1px;
+        background: rgba(255,255,255,0.1);
+        margin: 12px 0;
+    }
+
+    .row-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 12px;
+        opacity: 0.9;
+    }
+    .switch {
+        position: relative;
+        width: 40px;
+        height: 22px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 11px;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+    }
+    .switch::after {
+        content: '';
+        position: absolute;
+        top: 2px; left: 2px;
+        width: 18px; height: 18px;
+        background: white;
+        border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .switch.on { background: #4facfe; }
+    .switch.on::after { transform: translateX(18px); }
+
+    .limit-block {
+        opacity: 0.4;
+        pointer-events: none;
+        transition: opacity 0.2s;
+    }
+    .limit-block.enabled {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .tex-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 8px;
+    }
+
+    .tex-card .tex-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #4facfe;
+        margin-bottom: 5px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .tex-card .tex-title::before {
+        content: '🖼️';
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    .tex-card .tex-thumb {
+        width: 100%;
+        height: 42px;
+        border-radius: 6px;
+        background-size: cover;
+        background-position: center;
+        background-color: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: rgba(255,255,255,0.35);
+        margin-bottom: 6px;
+    }
+
+    .upload-btn {
+        width: 100%;
+        padding: 7px;
+        border-radius: 6px;
+        border: 1px dashed rgba(79,172,254,0.5);
+        background: rgba(79,172,254,0.1);
+        color: #4facfe;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .upload-btn:active { background: rgba(79,172,254,0.25); }
+
+    #resetBtn, #resetPaintBtn, #resetTexBtn, #exportBtn {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        margin-top: 5px;
+    }
+    #resetBtn {
+        border: 1px solid rgba(255,100,100,0.4);
+        background: rgba(255,80,80,0.15);
+        color: #ff9999;
+    }
+    #resetPaintBtn {
+        border: 1px solid rgba(255,180,100,0.4);
+        background: rgba(255,150,60,0.15);
+        color: #ffbb77;
+    }
+    #resetTexBtn {
+        border: 1px solid rgba(120,180,255,0.4);
+        background: rgba(80,150,255,0.15);
+        color: #99bbff;
+        margin-bottom: 5px;
+    }
+    #exportBtn {
+        border: 1px solid rgba(80,220,120,0.5);
+        background: rgba(60,200,100,0.2);
+        color: #7dffa8;
+        font-weight: 700;
+        margin-top: 10px;
+    }
+    #exportBtn:active { background: rgba(60,200,100,0.4); }
+    #exportBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .res-select {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+    .res-select button {
+        flex: 1;
+        padding: 6px;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.05);
+        color: #ccc;
+        font-size: 11px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .res-select button.active {
+        background: rgba(79,172,254,0.3);
+        border-color: #4facfe;
+        color: white;
+    }
+
+    #camPad {
+        position: fixed;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: calc(100vw - 28px);
+        max-width: 480px;
+        height: 82px;
+        background: rgba(20,20,30,0.45);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.22);
+        border-radius: 16px;
+        z-index: 25;
+        display: flex;
+        overflow: hidden;
+        touch-action: none;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+
+    .camZone {
+        flex: 1 1 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255,255,255,0.65);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.6px;
+        transition: background 0.12s;
+        position: relative;
+        min-width: 0;
+    }
+    .camZone:not(:last-child) {
+        border-right: 1px solid rgba(255,255,255,0.12);
+    }
+    .camZone .icon {
+        font-size: 22px;
+        margin-bottom: 3px;
+        line-height: 1;
+    }
+    .camZone .label {
+        font-size: 10px;
+        opacity: 0.85;
+    }
+    .camZone.active {
+        background: rgba(79,172,254,0.5);
+        color: white;
+    }
+
+    #hint {
+        position: fixed;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 105px);
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        font-size: 11px;
+        opacity: 0.8;
+        background: rgba(0,0,0,0.55);
+        padding: 6px 14px;
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 10;
+        white-space: nowrap;
+        max-width: calc(100vw - 28px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
+    }
+
+    #brushPreview {
+        position: fixed;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 112px);
+        left: 15px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.4);
+        background-color: rgba(79,172,254,0.3);
+        background-size: cover;
+        background-position: center;
+        z-index: 15;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    #brushPreview.show { display: block; }
+
+    #toast {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        background: rgba(20,20,30,0.95);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 12px;
+        border: 1px solid rgba(79,172,254,0.5);
+        font-size: 14px;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.25s;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        max-width: 80vw;
+        line-height: 1.4;
+    }
+    #toast.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    @media (max-height: 600px) {
+        #camPad { height: 72px; }
+        .camZone .icon { font-size: 18px; }
+        .camZone .label { font-size: 9px; }
+        #hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); }
+        #brushPreview { bottom: calc(env(safe-area-inset-bottom, 0px) + 98px); }
+    }
+    @media (min-width: 600px) {
+        #camPad { height: 92px; }
+        .camZone .icon { font-size: 26px; }
+        .camZone .label { font-size: 11px; }
+    }
+</style>
+</head>
+<body>
+
+<button id="gearBtn">⚙️</button>
+
+<div id="modeBar">
+    <button id="mSculpt" class="active">🎨 Sculpt</button>
+    <button id="mPaint">🖌️ Paint</button>
+</div>
+
+<div id="panel">
+    <div id="sculptPanel">
+        <h3>Mode Sculpt</h3>
+        <div class="mode-btns">
+            <button id="upBtn" class="active" data-dir="up">⬆️ Naik</button>
+            <button id="downBtn" data-dir="down">⬇️ Turun</button>
+            <button id="smoothBtn" data-dir="smooth">✨ Halus</button>
+        </div>
+
+        <label>Ukuran Kuas <span class="val" id="brushVal">5.0</span></label>
+        <input type="range" id="brushSize" min="2" max="12" step="0.5" value="5">
+
+        <label>Kekuatan <span class="val" id="strengthVal">0.50</span></label>
+        <input type="range" id="strength" min="0.1" max="1.5" step="0.05" value="0.5">
+
+        <div class="divider"></div>
+
+        <h3>Batas Ketinggian</h3>
+        <div class="row-toggle">
+            <span>🔒 Aktifkan Limit</span>
+            <div class="switch" id="limitSwitch"></div>
+        </div>
+
+        <div class="limit-block" id="limitBlock">
+            <label>Ketinggian Maks <span class="val" id="maxHeightVal">10.0</span></label>
+            <input type="range" id="maxHeight" min="1" max="25" step="0.5" value="10">
+
+            <label>Ketinggian Min <span class="val" id="minHeightVal">-10.0</span></label>
+            <input type="range" id="minHeight" min="-25" max="-1" step="0.5" value="-10">
+        </div>
+
+        <button id="resetBtn">🔄 Reset Tanah</button>
+    </div>
+
+    <div id="paintPanel" style="display:none;">
+        <h3>Mode Paint</h3>
+
+        <label>Ukuran Kuas <span class="val" id="paintSizeVal">8.0</span></label>
+        <input type="range" id="paintSize" min="2" max="20" step="0.5" value="8">
+
+        <label>Opacity <span class="val" id="paintOpacityVal">0.8</span></label>
+        <input type="range" id="paintOpacity" min="0.1" max="1" step="0.05" value="0.8">
+
+        <label>Kekerasan (Hardness) <span class="val" id="paintHardnessVal">0.50</span></label>
+        <input type="range" id="paintHardness" min="0" max="1" step="0.05" value="0.5">
+
+        <div class="divider"></div>
+
+        <h3>Tekstur</h3>
+        <div class="tex-card">
+            <div class="tex-title" id="texTitle">Belum ada gambar</div>
+            <div class="tex-thumb" id="texThumb">Kosong</div>
+            <button class="upload-btn" id="uploadBtn">📷 Pilih Gambar</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none;">
+
+        <div class="divider"></div>
+
+        <h3>Pengaturan Tekstur</h3>
+
+        <label>Skala (Zoom) <span class="val" id="texScaleVal">3.0</span></label>
+        <input type="range" id="texScale" min="0.5" max="10" step="0.1" value="3">
+
+        <label>Rotasi <span class="val" id="texRotationVal">0°</span></label>
+        <input type="range" id="texRotation" min="0" max="360" step="1" value="0">
+
+        <label>Offset X <span class="val" id="texOffsetXVal">0.00</span></label>
+        <input type="range" id="texOffsetX" min="-1" max="1" step="0.01" value="0">
+
+        <label>Offset Y <span class="val" id="texOffsetYVal">0.00</span></label>
+        <input type="range" id="texOffsetY" min="-1" max="1" step="0.01" value="0">
+
+        <div class="row-toggle" style="margin-top:6px;">
+            <span>🧗 Anti-Stretch (Tebing)</span>
+            <div class="switch on" id="stretchSwitch"></div>
+        </div>
+
+        <button id="resetTexBtn">🔄 Reset Pengaturan Tekstur</button>
+        <button id="resetPaintBtn">🔄 Reset Warna</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Export Objek</h3>
+    <label style="font-size:11px;opacity:0.7;display:block;margin-bottom:6px;">
+        Simpan ke folder di memori internal
+    </label>
+
+    <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Resolusi Tekstur</div>
+    <div class="res-select" id="resSelect">
+        <button data-res="1024">1K</button>
+        <button data-res="2048" class="active">2K</button>
+        <button data-res="4096">4K</button>
+    </div>
+
+    <div class="row-toggle" style="margin-top:6px;">
+        <span>💡 Normal Ganda (Double-side)</span>
+        <div class="switch on" id="doubleSideSwitch"></div>
+    </div>
+
+    <button id="exportBtn">📁 Simpan ke Folder</button>
+</div>
+
+<div id="camPad">
+    <div class="camZone" data-zone="pan">
+        <div class="icon">✋</div>
+        <div class="label">GESER</div>
+    </div>
+    <div class="camZone" data-zone="orbit">
+        <div class="icon">🔄</div>
+        <div class="label">ORBIT</div>
+    </div>
+    <div class="camZone" data-zone="zoom">
+        <div class="icon">🔍</div>
+        <div class="label">ZOOM</div>
+    </div>
+</div>
+
+<div id="brushPreview"></div>
+
+
+<div id="toast"></div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ============ TOAST ============
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function showToast(msg, duration = 2200) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
+}
+
+// ============ SETUP ============
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a20);
+scene.fog = new THREE.FogExp2(0x0a0a20, 0.008);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 500);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+document.body.appendChild(renderer.domElement);
+
+// ============ CAHAYA ============
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(20, 40, 20);
+scene.add(dirLight);
+
+// Cahaya tambahan dari bawah (biar sisi bawah tidak hitam)
+const fillLight = new THREE.DirectionalLight(0xaaccff, 0.3);
+fillLight.position.set(-20, -30, -20);
+scene.add(fillLight);
+
+// ============ TERRAIN ============
+const SIZE = 60;
+const SEG = 128;
+const GRID = SEG + 1;
+
+const geometry = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+geometry.rotateX(-Math.PI / 2);
+
+const vertColors = new Float32Array(geometry.attributes.position.count * 3);
+const defaultColor = new THREE.Color(0x4a7ab5);
+for (let i = 0; i < vertColors.length; i += 3) {
+    vertColors[i] = defaultColor.r;
+    vertColors[i+1] = defaultColor.g;
+    vertColors[i+2] = defaultColor.b;
+}
+geometry.setAttribute('color', new THREE.BufferAttribute(vertColors, 3));
+
+const material = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    color: 0xffffff,
+    roughness: 0.85,
+    metalness: 0.05,
+    side: THREE.DoubleSide
+});
+
+const terrain = new THREE.Mesh(geometry, material);
+scene.add(terrain);
+
+const posAttr = geometry.attributes.position;
+const colorAttr = geometry.attributes.color;
+const vertexArray = posAttr.array;
+const colorArray = colorAttr.array;
+const totalVertices = posAttr.count;
+
+const vX = new Float32Array(totalVertices);
+const vZ = new Float32Array(totalVertices);
+for (let i = 0; i < totalVertices; i++) {
+    vX[i] = vertexArray[i * 3];
+    vZ[i] = vertexArray[i * 3 + 2];
+}
+
+const normals = new Float32Array(totalVertices);
+function updateNormalsCache() {
+    const nAttr = geometry.attributes.normal;
+    for (let i = 0; i < totalVertices; i++) {
+        normals[i] = nAttr.getY(i);
+    }
+}
+
+// ============ KAMERA ============
+const cameraState = {
+    target: new THREE.Vector3(0, 0, 0),
+    theta: Math.PI / 4,
+    phi: Math.PI / 3.5,
+    distance: 55
+};
+
+function updateCamera() {
+    const sinPhi = Math.sin(cameraState.phi);
+    camera.position.x = cameraState.target.x + cameraState.distance * sinPhi * Math.sin(cameraState.theta);
+    camera.position.y = cameraState.target.y + cameraState.distance * Math.cos(cameraState.phi);
+    camera.position.z = cameraState.target.z + cameraState.distance * sinPhi * Math.cos(cameraState.theta);
+    camera.lookAt(cameraState.target);
+}
+updateCamera();
+
+// ============ STATE ============
+let currentMode = 'sculpt';
+let sculptDir = 'up';
+let brushSize = 5;
+let strength = 0.5;
+let limitEnabled = false;
+let maxHeight = 10;
+let minHeight = -10;
+
+let paintSize = 8;
+let paintOpacity = 0.8;
+let paintHardness = 0.5;
+
+let paintTextureImage = null;
+let textureCanvas = null;
+let textureData = null;
+let textureSampleSize = 64;
+
+let texScale = 3.0;
+let texRotation = 0;
+let texOffsetX = 0;
+let texOffsetY = 0;
+let antiStretch = true;
+
+let exportRes = 2048;
+let doubleSided = true;   // double-sided lighting
+let savedDirHandle = null;
+const supportsFS = ('showDirectoryPicker' in window);
+
+// ============ UI: GEAR ============
+const gearBtn = document.getElementById('gearBtn');
+const panel = document.getElementById('panel');
+gearBtn.addEventListener('click', () => panel.classList.toggle('show'));
+
+// ============ UI: MODE BAR ============
+const mSculpt = document.getElementById('mSculpt');
+const mPaint = document.getElementById('mPaint');
+const sculptPanel = document.getElementById('sculptPanel');
+const paintPanel = document.getElementById('paintPanel');
+const hintEl = document.getElementById('hint');
+const brushPreview = document.getElementById('brushPreview');
+
+function setMode(m) {
+    currentMode = m;
+    mSculpt.classList.toggle('active', m === 'sculpt');
+    mPaint.classList.toggle('active', m === 'paint');
+    sculptPanel.style.display = m === 'sculpt' ? 'block' : 'none';
+    paintPanel.style.display = m === 'paint' ? 'block' : 'none';
+    updateBrushPreview();
+    hintEl.textContent = m === 'sculpt'
+        ? '🎨 Sentuh tanah untuk sculpt · Panel bawah untuk kamera'
+        : '🖌️ Sentuh tanah untuk melukis tekstur';
+}
+mSculpt.addEventListener('click', () => setMode('sculpt'));
+mPaint.addEventListener('click', () => setMode('paint'));
+
+// ============ UI: SCULPT ============
+const upBtn = document.getElementById('upBtn');
+const downBtn = document.getElementById('downBtn');
+const smoothBtn = document.getElementById('smoothBtn');
+
+function setSculptDir(dir) {
+    sculptDir = dir;
+    upBtn.classList.toggle('active', dir === 'up');
+    downBtn.classList.toggle('active', dir === 'down');
+    smoothBtn.classList.toggle('active', dir === 'smooth');
+
+    if (currentMode === 'sculpt') {
+        if (dir === 'smooth') {
+            hintEl.textContent = '✨ Sentuh & geser untuk menghaluskan permukaan';
+        } else {
+            hintEl.textContent = '🎨 Sentuh tanah untuk sculpt · Panel bawah untuk kamera';
+        }
+    }
+}
+
+upBtn.addEventListener('click', () => setSculptDir('up'));
+downBtn.addEventListener('click', () => setSculptDir('down'));
+smoothBtn.addEventListener('click', () => setSculptDir('smooth'));
+
+const brushSlider = document.getElementById('brushSize');
+const brushVal = document.getElementById('brushVal');
+brushSlider.addEventListener('input', e => {
+    brushSize = parseFloat(e.target.value);
+    brushVal.textContent = brushSize.toFixed(1);
+});
+
+const strengthSlider = document.getElementById('strength');
+const strengthVal = document.getElementById('strengthVal');
+strengthSlider.addEventListener('input', e => {
+    strength = parseFloat(e.target.value);
+    strengthVal.textContent = strength.toFixed(2);
+});
+
+// ============ UI: LIMIT ============
+const limitSwitch = document.getElementById('limitSwitch');
+const limitBlock = document.getElementById('limitBlock');
+const maxSlider = document.getElementById('maxHeight');
+const maxVal = document.getElementById('maxHeightVal');
+const minSlider = document.getElementById('minHeight');
+const minVal = document.getElementById('minHeightVal');
+
+limitSwitch.addEventListener('click', () => {
+    limitEnabled = !limitEnabled;
+    limitSwitch.classList.toggle('on', limitEnabled);
+    limitBlock.classList.toggle('enabled', limitEnabled);
+});
+
+maxSlider.addEventListener('input', e => {
+    maxHeight = parseFloat(e.target.value);
+    if (maxHeight <= minHeight + 1) { maxHeight = minHeight + 1; maxSlider.value = maxHeight; }
+    maxVal.textContent = maxHeight.toFixed(1);
+});
+
+minSlider.addEventListener('input', e => {
+    minHeight = parseFloat(e.target.value);
+    if (minHeight >= maxHeight - 1) { minHeight = maxHeight - 1; minSlider.value = minHeight; }
+    minVal.textContent = minHeight.toFixed(1);
+});
+
+// ============ UI: PAINT ============
+const paintSizeSlider = document.getElementById('paintSize');
+const paintSizeVal = document.getElementById('paintSizeVal');
+paintSizeSlider.addEventListener('input', e => {
+    paintSize = parseFloat(e.target.value);
+    paintSizeVal.textContent = paintSize.toFixed(1);
+    updateBrushPreview();
+});
+
+const paintOpacitySlider = document.getElementById('paintOpacity');
+const paintOpacityVal = document.getElementById('paintOpacityVal');
+paintOpacitySlider.addEventListener('input', e => {
+    paintOpacity = parseFloat(e.target.value);
+    paintOpacityVal.textContent = paintOpacity.toFixed(2);
+});
+
+const paintHardnessSlider = document.getElementById('paintHardness');
+const paintHardnessVal = document.getElementById('paintHardnessVal');
+paintHardnessSlider.addEventListener('input', e => {
+    paintHardness = parseFloat(e.target.value);
+    paintHardnessVal.textContent = paintHardness.toFixed(2);
+});
+
+// ============ UI: TEKSTUR ============
+const texScaleSlider = document.getElementById('texScale');
+const texScaleVal = document.getElementById('texScaleVal');
+texScaleSlider.addEventListener('input', e => {
+    texScale = parseFloat(e.target.value);
+    texScaleVal.textContent = texScale.toFixed(1);
+});
+
+const texRotationSlider = document.getElementById('texRotation');
+const texRotationVal = document.getElementById('texRotationVal');
+texRotationSlider.addEventListener('input', e => {
+    texRotation = parseFloat(e.target.value);
+    texRotationVal.textContent = texRotation + '°';
+});
+
+const texOffsetXSlider = document.getElementById('texOffsetX');
+const texOffsetXVal = document.getElementById('texOffsetXVal');
+texOffsetXSlider.addEventListener('input', e => {
+    texOffsetX = parseFloat(e.target.value);
+    texOffsetXVal.textContent = texOffsetX.toFixed(2);
+});
+
+const texOffsetYSlider = document.getElementById('texOffsetY');
+const texOffsetYVal = document.getElementById('texOffsetYVal');
+texOffsetYSlider.addEventListener('input', e => {
+    texOffsetY = parseFloat(e.target.value);
+    texOffsetYVal.textContent = texOffsetY.toFixed(2);
+});
+
+const stretchSwitch = document.getElementById('stretchSwitch');
+stretchSwitch.addEventListener('click', () => {
+    antiStretch = !antiStretch;
+    stretchSwitch.classList.toggle('on', antiStretch);
+    recomputeAdaptiveUV();
+});
+
+document.getElementById('resetTexBtn').addEventListener('click', () => {
+    texScale = 3.0; texRotation = 0; texOffsetX = 0; texOffsetY = 0;
+    texScaleSlider.value = 3; texScaleVal.textContent = '3.0';
+    texRotationSlider.value = 0; texRotationVal.textContent = '0°';
+    texOffsetXSlider.value = 0; texOffsetXVal.textContent = '0.00';
+    texOffsetYSlider.value = 0; texOffsetYVal.textContent = '0.00';
+});
+
+// ============ UI: RESOLUSI EXPORT ============
+const resButtons = document.querySelectorAll('#resSelect button');
+resButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        resButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        exportRes = parseInt(btn.dataset.res);
+    });
+});
+
+// ============ UI: DOUBLE-SIDED ============
+const doubleSideSwitch = document.getElementById('doubleSideSwitch');
+doubleSideSwitch.addEventListener('click', () => {
+    doubleSided = !doubleSided;
+    doubleSideSwitch.classList.toggle('on', doubleSided);
+});
+
+// ============ UI: UPLOAD ============
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
+const texTitle = document.getElementById('texTitle');
+const texThumb = document.getElementById('texThumb');
+
+uploadBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+            paintTextureImage = img;
+            prepareTextureCanvas(img);
+
+            const name = file.name.replace(/\.[^/.]+$/, '');
+            texTitle.textContent = name || 'Tekstur';
+            texThumb.textContent = '';
+            texThumb.style.backgroundImage = `url(${evt.target.result})`;
+            texThumb.style.color = 'transparent';
+
+            updateBrushPreview();
+            if (currentMode !== 'paint') setMode('paint');
+        };
+        img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+// ============ PREVIEW KUAS ============
+function updateBrushPreview() {
+    if (currentMode !== 'paint' || !paintTextureImage) {
+        brushPreview.classList.remove('show');
+        return;
+    }
+    brushPreview.classList.add('show');
+    brushPreview.style.width = Math.min(80, paintSize * 3) + 'px';
+    brushPreview.style.height = Math.min(80, paintSize * 3) + 'px';
+    brushPreview.style.backgroundImage = `url(${paintTextureImage.src})`;
+}
+
+// ============ RESET ============
+document.getElementById('resetBtn').addEventListener('click', () => {
+    for (let i = 0; i < totalVertices; i++) vertexArray[i * 3 + 1] = 0;
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    updateNormalsCache();
+    recomputeAdaptiveUV();
+});
+
+document.getElementById('resetPaintBtn').addEventListener('click', () => {
+    for (let i = 0; i < totalVertices; i++) {
+        colorArray[i * 3] = defaultColor.r;
+        colorArray[i * 3 + 1] = defaultColor.g;
+        colorArray[i * 3 + 2] = defaultColor.b;
+    }
+    colorAttr.needsUpdate = true;
+});
+
+// ============ RAYCASTER ============
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function getTerrainHit(clientX, clientY) {
+    pointer.x = (clientX / innerWidth) * 2 - 1;
+    pointer.y = -(clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObject(terrain);
+    return hits.length > 0 ? hits[0] : null;
+}
+
+// ============ SCULPT ============
+function sculpt(clientX, clientY) {
+    const hit = getTerrainHit(clientX, clientY);
+    if (!hit) return;
+    const point = hit.point;
+
+    const radius = brushSize;
+    const r2 = radius * radius;
+
+    if (sculptDir === 'smooth') {
+        let sumY = 0;
+        let sumW = 0;
+
+        for (let i = 0; i < totalVertices; i++) {
+            const dx = vX[i] - point.x;
+            const dz = vZ[i] - point.z;
+            const d2 = dx*dx + dz*dz;
+            if (d2 > r2) continue;
+
+            const t = 1 - Math.sqrt(d2) / radius;
+            sumY += vertexArray[i * 3 + 1] * t;
+            sumW += t;
+        }
+
+        if (sumW < 0.0001) return;
+        const avgY = sumY / sumW;
+
+        for (let i = 0; i < totalVertices; i++) {
+            const dx = vX[i] - point.x;
+            const dz = vZ[i] - point.z;
+            const d2 = dx*dx + dz*dz;
+            if (d2 > r2) continue;
+
+            const t = 1 - Math.sqrt(d2) / radius;
+            const curY = vertexArray[i * 3 + 1];
+            const lerpAmount = Math.min(1, strength * t * 0.5);
+            let newY = curY + (avgY - curY) * lerpAmount;
+
+            if (limitEnabled) {
+                if (newY > maxHeight) newY = maxHeight;
+                else if (newY < minHeight) newY = minHeight;
+            }
+
+            vertexArray[i * 3 + 1] = newY;
+        }
+
+    } else {
+        const dir = sculptDir === 'up' ? 1 : -1;
+
+        for (let i = 0; i < totalVertices; i++) {
+            const dx = vX[i] - point.x;
+            const dz = vZ[i] - point.z;
+            const d2 = dx*dx + dz*dz;
+            if (d2 > r2) continue;
+
+            const falloff = 1 - Math.sqrt(d2) / radius;
+            let newY = vertexArray[i * 3 + 1] + dir * strength * falloff;
+
+            if (limitEnabled) {
+                if (newY > maxHeight) newY = maxHeight;
+                else if (newY < minHeight) newY = minHeight;
+            }
+
+            vertexArray[i * 3 + 1] = newY;
+        }
+    }
+
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    updateNormalsCache();
+    recomputeAdaptiveUV();
+}
+
+// ============ PAINT ============
+function prepareTextureCanvas(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = textureSampleSize;
+    canvas.height = textureSampleSize;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, textureSampleSize, textureSampleSize);
+    textureCanvas = canvas;
+    textureData = ctx.getImageData(0, 0, textureSampleSize, textureSampleSize).data;
+}
+
+function sampleTexture(u, v) {
+    if (!textureData) return null;
+    const size = textureSampleSize;
+    let x = Math.floor(((u % 1) + 1) % 1 * size);
+    let y = Math.floor(((v % 1) + 1) % 1 * size);
+    if (x >= size) x = size - 1;
+    if (y >= size) y = size - 1;
+    const idx = (y * size + x) * 4;
+    return {
+        r: textureData[idx] / 255,
+        g: textureData[idx + 1] / 255,
+        b: textureData[idx + 2] / 255
+    };
+}
+
+function transformUV(u, v) {
+    let uu = u + texOffsetX;
+    let vv = v + texOffsetY;
+
+    if (texRotation !== 0) {
+        const rad = texRotation * Math.PI / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const cu = uu - 0.5;
+        const cv = vv - 0.5;
+        uu = cu * cos - cv * sin + 0.5;
+        vv = cu * sin + cv * cos + 0.5;
+    }
+
+    uu *= texScale;
+    vv *= texScale;
+
+    return { u: uu, v: vv };
+}
+
+function computeFalloff(distance, radius, hardness) {
+    const t = 1 - distance / radius;
+    if (t <= 0) return 0;
+    const power = 0.3 + hardness * hardness * 5;
+    return Math.pow(t, power);
+}
+
+const uvAttr = geometry.attributes.uv;
+const uvArray = uvAttr.array;
+
+const uvBaseX = new Float32Array(totalVertices);
+const uvBaseY = new Float32Array(totalVertices);
+for (let i = 0; i < totalVertices; i++) {
+    uvBaseX[i] = uvArray[i * 2];
+    uvBaseY[i] = uvArray[i * 2 + 1];
+}
+
+function recomputeAdaptiveUV() {
+    if (!antiStretch) {
+        for (let i = 0; i < totalVertices; i++) {
+            uvArray[i * 2] = uvBaseX[i];
+            uvArray[i * 2 + 1] = uvBaseY[i];
+        }
+        uvAttr.needsUpdate = true;
+        return;
+    }
+    for (let i = 0; i < totalVertices; i++) {
+        const ny = Math.abs(normals[i]);
+        const clampNY = Math.max(ny, 0.15);
+        uvArray[i * 2] = uvBaseX[i] * clampNY;
+        uvArray[i * 2 + 1] = uvBaseY[i] * clampNY;
+    }
+    uvAttr.needsUpdate = true;
+}
+
+function paint(clientX, clientY) {
+    if (!paintTextureImage || !textureData) return;
+
+    const hit = getTerrainHit(clientX, clientY);
+    if (!hit) return;
+    const point = hit.point;
+
+    const radius = paintSize;
+    const r2 = radius * radius;
+
+    for (let i = 0; i < totalVertices; i++) {
+        const dx = vX[i] - point.x;
+        const dz = vZ[i] - point.z;
+        const d2 = dx*dx + dz*dz;
+        if (d2 > r2) continue;
+
+        const distance = Math.sqrt(d2);
+        const falloff = computeFalloff(distance, radius, paintHardness);
+        const alpha = paintOpacity * falloff;
+        if (alpha < 0.001) continue;
+
+        const u = uvArray[i * 2];
+        const v = uvArray[i * 2 + 1];
+        const t = transformUV(u, v);
+        const texColor = sampleTexture(t.u, t.v);
+        if (!texColor) continue;
+
+        colorArray[i * 3]     = colorArray[i * 3]     * (1 - alpha) + texColor.r * alpha;
+        colorArray[i * 3 + 1] = colorArray[i * 3 + 1] * (1 - alpha) + texColor.g * alpha;
+        colorArray[i * 3 + 2] = colorArray[i * 3 + 2] * (1 - alpha) + texColor.b * alpha;
+    }
+
+    colorAttr.needsUpdate = true;
+}
+
+// ============ BAKE TEXTURE ============
+function bakeVertexColorsToCanvas(resolution) {
+    const W = GRID;
+    const canvas = document.createElement('canvas');
+    canvas.width = resolution;
+    canvas.height = resolution;
+    const ctx = canvas.getContext('2d');
+
+    const imgData = ctx.createImageData(resolution, resolution);
+    const data = imgData.data;
+
+    const colR = new Uint8ClampedArray(totalVertices);
+    const colG = new Uint8ClampedArray(totalVertices);
+    const colB = new Uint8ClampedArray(totalVertices);
+    for (let i = 0; i < totalVertices; i++) {
+        colR[i] = Math.round(Math.min(1, Math.max(0, colorArray[i * 3])) * 255);
+        colG[i] = Math.round(Math.min(1, Math.max(0, colorArray[i * 3 + 1])) * 255);
+        colB[i] = Math.round(Math.min(1, Math.max(0, colorArray[i * 3 + 2])) * 255);
+    }
+
+    for (let py = 0; py < resolution; py++) {
+        const v = (1 - py / (resolution - 1)) * SEG;
+        const fy = Math.min(SEG - 1, Math.floor(v));
+        const ty = v - fy;
+
+        for (let px = 0; px < resolution; px++) {
+            const u = (px / (resolution - 1)) * SEG;
+            const fx = Math.min(SEG - 1, Math.floor(u));
+            const tx = u - fx;
+
+            const i00 = fy * W + fx;
+            const i10 = fy * W + fx + 1;
+            const i01 = (fy + 1) * W + fx;
+            const i11 = (fy + 1) * W + fx + 1;
+
+            const w00 = (1 - tx) * (1 - ty);
+            const w10 = tx * (1 - ty);
+            const w01 = (1 - tx) * ty;
+            const w11 = tx * ty;
+
+            const r = colR[i00]*w00 + colR[i10]*w10 + colR[i01]*w01 + colR[i11]*w11;
+            const g = colG[i00]*w00 + colG[i10]*w10 + colG[i01]*w01 + colG[i11]*w11;
+            const b = colB[i00]*w00 + colB[i10]*w10 + colB[i01]*w01 + colB[i11]*w11;
+
+            const pidx = (py * resolution + px) * 4;
+            data[pidx]     = r;
+            data[pidx + 1] = g;
+            data[pidx + 2] = b;
+            data[pidx + 3] = 255;
+        }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+}
+
+// ============ RECOMPUTE NORMAL DENGAN ARAH KONSISTEN ============
+// Setelah computeVertexNormals(), pastikan semua normal menghadap ke atas (y > 0)
+// Ini mencegah sisi bawah terang, sisi atas gelap.
+function fixNormalsUpward() {
+    const nAttr = geometry.attributes.normal;
+    const nArr = nAttr.array;
+    let fixed = 0;
+
+    for (let i = 0; i < totalVertices; i++) {
+        const nx = nArr[i * 3];
+        const ny = nArr[i * 3 + 1];
+        const nz = nArr[i * 3 + 2];
+
+        // Kalau normal menghadap ke bawah (y negatif), balik
+        if (ny < 0) {
+            nArr[i * 3] = -nx;
+            nArr[i * 3 + 1] = -ny;
+            nArr[i * 3 + 2] = -nz;
+            fixed++;
+        } else if (ny === 0 && nx === 0 && nz === 0) {
+            // Normal nol (degenerate) → paksa ke atas
+            nArr[i * 3] = 0;
+            nArr[i * 3 + 1] = 1;
+            nArr[i * 3 + 2] = 0;
+            fixed++;
+        }
+    }
+
+    if (fixed > 0) {
+        nAttr.needsUpdate = true;
+    }
+    return fixed;
+}
+
+// ============ SIMPAN KE FOLDER ============
+async function saveToFolder() {
+    const btn = document.getElementById('exportBtn');
+
+    if (!supportsFS) {
+        showToast('❌ Browser tidak mendukung.\nGunakan Chrome/Edge.', 4000);
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Menyiapkan...';
+
+    try {
+        let dirHandle = savedDirHandle;
+
+        if (!dirHandle) {
+            try {
+                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                savedDirHandle = dirHandle;
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = '📁 Simpan ke Folder';
+                return;
+            }
+        }
+
+        try {
+            const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') {
+                const req = await dirHandle.requestPermission({ mode: 'readwrite' });
+                if (req !== 'granted') throw new Error('Izin tulis ditolak');
+            }
+        } catch (e) { /* ignore */ }
+
+        showToast('⏳ Baking tekstur ' + (exportRes/1024) + 'K...', 3000);
+        btn.textContent = '⏳ Baking tekstur...';
+        await new Promise(r => setTimeout(r, 50));
+
+        // Hitung normal + perbaiki arah
+        geometry.computeVertexNormals();
+        const fixedCount = fixNormalsUpward();
+        if (fixedCount > 0) {
+            console.log('Diperbaiki ' + fixedCount + ' normal yang menghadap ke bawah');
+        }
+
+        const bakeCanvas = bakeVertexColorsToCanvas(exportRes);
+        const bakeBlob = await new Promise(res => bakeCanvas.toBlob(res, 'image/png'));
+
+        const pos = geometry.attributes.position.array;
+        const nrm = geometry.attributes.normal.array;
+
+        let objText = '';
+        objText += '# Terrain 3D Export\n';
+        objText += `# Vertices: ${totalVertices}\n`;
+        objText += `# Texture: ${exportRes}x${exportRes}\n\n`;
+        objText += 'mtllib terrain.mtl\n\n';
+        objText += 'o Terrain\n\n';
+
+        objText += '# Vertices (with vertex color)\n';
+        for (let i = 0; i < totalVertices; i++) {
+            const r = colorArray[i*3].toFixed(4);
+            const g = colorArray[i*3+1].toFixed(4);
+            const b = colorArray[i*3+2].toFixed(4);
+            objText += `v ${pos[i*3].toFixed(4)} ${pos[i*3+1].toFixed(4)} ${pos[i*3+2].toFixed(4)} ${r} ${g} ${b}\n`;
+        }
+
+        objText += '\n# Texture Coordinates (planar)\n';
+        for (let i = 0; i < totalVertices; i++) {
+            objText += `vt ${uvBaseX[i].toFixed(6)} ${uvBaseY[i].toFixed(6)}\n`;
+        }
+
+        objText += '\n# Normals\n';
+        for (let i = 0; i < totalVertices; i++) {
+            objText += `vn ${nrm[i*3].toFixed(4)} ${nrm[i*3+1].toFixed(4)} ${nrm[i*3+2].toFixed(4)}\n`;
+        }
+
+        objText += '\n# Faces\n';
+        objText += 'g TerrainMesh\n';
+        objText += 'usemtl TerrainMaterial\n';
+        objText += 's off\n';
+
+        // Winding order CCW dilihat dari atas (normal +Y)
+        // Dengan begitu, normal permukaan konsisten menghadap ke atas
+        for (let y = 0; y < SEG; y++) {
+            for (let x = 0; x < SEG; x++) {
+                const a = y * GRID + x + 1;
+                const b = y * GRID + x + 2;
+                const c = (y + 1) * GRID + x + 2;
+                const d = (y + 1) * GRID + x + 1;
+
+                // CCW dari atas: a → d → c, dan a → c → b
+                // (perhatikan: urutan ini memastikan normal menghadap +Y)
+                objText += `f ${a}/${a}/${a} ${d}/${d}/${d} ${c}/${c}/${c}\n`;
+                objText += `f ${a}/${a}/${a} ${c}/${c}/${c} ${b}/${b}/${b}\n`;
+            }
+        }
+
+        // MTL
+        let mtlText = '';
+        mtlText += '# Terrain 3D Material\n';
+        mtlText += 'newmtl TerrainMaterial\n';
+        mtlText += 'Ka 0.400 0.400 0.400\n';   // ambient lebih tinggi biar tidak hitam
+        mtlText += 'Kd 1.000 1.000 1.000\n';
+        mtlText += 'Ks 0.000 0.000 0.000\n';
+        mtlText += 'Ns 10.0\n';
+        mtlText += 'd 1.0\n';
+        mtlText += 'illum 2\n';
+        mtlText += 'map_Kd texture.png\n';
+
+        btn.textContent = '💾 Menulis file...';
+
+        const objFile = await dirHandle.getFileHandle('terrain.obj', { create: true });
+        const objWritable = await objFile.createWritable();
+        await objWritable.write(objText);
+        await objWritable.close();
+
+        const mtlFile = await dirHandle.getFileHandle('terrain.mtl', { create: true });
+        const mtlWritable = await mtlFile.createWritable();
+        await mtlWritable.write(mtlText);
+        await mtlWritable.close();
+
+        const texFile = await dirHandle.getFileHandle('texture.png', { create: true });
+        const texWritable = await texFile.createWritable();
+        await texWritable.write(bakeBlob);
+        await texWritable.close();
+
+        btn.textContent = '✅ Tersimpan!';
+        showToast('✅ Berhasil disimpan ke folder:\n"' + dirHandle.name + '"', 3500);
+
+        setTimeout(() => {
+            btn.textContent = '📁 Simpan ke Folder';
+            btn.disabled = false;
+        }, 1800);
+
+    } catch (err) {
+        console.error(err);
+        btn.textContent = '❌ Gagal';
+        showToast('❌ Gagal: ' + err.message, 3000);
+        setTimeout(() => {
+            btn.textContent = '📁 Simpan ke Folder';
+            btn.disabled = false;
+        }, 1800);
+    }
+}
+
+document.getElementById('exportBtn').addEventListener('click', saveToFolder);
+
+// ============ KAMERA CONTROL ============
+function doOrbit(dx, dy) {
+    cameraState.theta -= dx * 0.008;
+    cameraState.phi = Math.max(0.15, Math.min(Math.PI / 2.05, cameraState.phi - dy * 0.008));
+    updateCamera();
+}
+
+function doPan(dx, dy) {
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3();
+    right.crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
+
+    const panSpeed = cameraState.distance * 0.002;
+    cameraState.target.x -= right.x * dx * panSpeed + forward.x * dy * panSpeed;
+    cameraState.target.z -= right.z * dx * panSpeed + forward.z * dy * panSpeed;
+    updateCamera();
+}
+
+function doZoom(dy) {
+    cameraState.distance = Math.max(10, Math.min(150, cameraState.distance + dy * 0.4));
+    updateCamera();
+}
+
+// ============ HIGHLIGHT ============
+const camZones = document.querySelectorAll('.camZone');
+function highlightZone(zone) {
+    camZones.forEach(z => z.classList.toggle('active', z.dataset.zone === zone));
+}
+function clearZoneHighlight() {
+    camZones.forEach(z => z.classList.remove('active'));
+}
+
+// ============ DRAG HANDLER ============
+let dragging = false;
+let dragMode = null;
+let lastX = 0, lastY = 0;
+
+function startDrag(mode, x, y) {
+    dragging = true;
+    dragMode = mode;
+    lastX = x;
+    lastY = y;
+    if (mode !== 'sculpt' && mode !== 'paint') highlightZone(mode);
+    if (mode === 'sculpt') sculpt(x, y);
+    if (mode === 'paint') paint(x, y);
+}
+
+function moveDrag(x, y) {
+    if (!dragging) return;
+    const dx = x - lastX;
+    const dy = y - lastY;
+    lastX = x;
+    lastY = y;
+
+    if (dragMode === 'sculpt') sculpt(x, y);
+    else if (dragMode === 'paint') paint(x, y);
+    else if (dragMode === 'orbit') doOrbit(dx, dy);
+    else if (dragMode === 'pan') doPan(dx, dy);
+    else if (dragMode === 'zoom') doZoom(dy);
+}
+
+function endDrag() {
+    dragging = false;
+    dragMode = null;
+    clearZoneHighlight();
+}
+
+// ============ LISTENER PANEL KAMERA ============
+camZones.forEach(zone => {
+    const zoneName = zone.dataset.zone;
+
+    zone.addEventListener('touchstart', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const t = e.changedTouches[0];
+        startDrag(zoneName, t.clientX, t.clientY);
+    }, { passive: false });
+
+    zone.addEventListener('touchmove', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const t = e.changedTouches[0];
+        moveDrag(t.clientX, t.clientY);
+    }, { passive: false });
+
+    zone.addEventListener('touchend', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        endDrag();
+    }, { passive: false });
+
+    zone.addEventListener('touchcancel', endDrag);
+
+    zone.addEventListener('mousedown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        startDrag(zoneName, e.clientX, e.clientY);
+    });
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (dragging) moveDrag(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', endDrag);
+
+// ============ LISTENER CANVAS ============
+renderer.domElement.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const action = currentMode === 'paint' ? 'paint' : 'sculpt';
+    startDrag(action, t.clientX, t.clientY);
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    moveDrag(t.clientX, t.clientY);
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    endDrag();
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchcancel', endDrag);
+
+renderer.domElement.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const action = currentMode === 'paint' ? 'paint' : 'sculpt';
+    startDrag(action, e.clientX, e.clientY);
+});
+
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+renderer.domElement.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    doZoom(e.deltaY * 0.1);
+}, { passive: false });
+
+// ============ INIT ============
+geometry.computeVertexNormals();
+fixNormalsUpward();
+updateNormalsCache();
+recomputeAdaptiveUV();
+
+if (!supportsFS) {
+    setTimeout(() => {
+        showToast('⚠️ Browser tidak mendukung simpan ke folder.\nGunakan Chrome/Edge Android/Desktop.', 5000);
+    }, 1000);
+}
+
+// ============ RENDER LOOP ============
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+animate();
+
+// ============ RESIZE ============
+addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
