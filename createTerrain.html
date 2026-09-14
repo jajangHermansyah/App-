@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
+<title>Terrain 3D - Sculpt & Paint</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+        overflow: hidden;
+        background: #0a0a20;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        touch-action: none;
+        height: 100%;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    canvas { display: block; }
+
+    #modeBar {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        left: calc(env(safe-area-inset-left, 0px) + 12px);
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 4px;
+        z-index: 30;
+    }
+
+    #modeBar button {
+        padding: 7px 10px;
+        border-radius: 9px;
+        border: 1px solid rgba(255,255,255,0.18);
+        background: rgba(20,20,30,0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #ccc;
+        font-size: 14px;
+        cursor: pointer;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: all 0.15s;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+        line-height: 1;
+        min-width: 36px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    #modeBar button.active {
+        background: #4facfe;
+        border-color: #4facfe;
+        color: #001;
+        font-weight: bold;
+        box-shadow: 0 0 12px rgba(79,172,254,0.5);
+    }
+
+    #modeBar button:active { transform: scale(0.95); }
+
+    #gestureBtn.active {
+        background: #ffc83d !important;
+        border-color: #ffc83d !important;
+        color: #001 !important;
+        box-shadow: 0 0 12px rgba(255,200,61,0.6) !important;
+    }
+
+    #gearBtn.active {
+        background: #4facfe;
+        border-color: #4facfe;
+        color: #001;
+        box-shadow: 0 0 12px rgba(79,172,254,0.5);
+    }
+
+    #panel {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 56px);
+        right: calc(env(safe-area-inset-right, 0px) + 12px);
+        background: rgba(20,20,30,0.92);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 14px;
+        padding: 15px;
+        color: white;
+        display: none;
+        z-index: 30;
+        border: 1px solid rgba(255,255,255,0.15);
+        width: min(260px, calc(100vw - 24px));
+        max-height: calc(100vh - 100px);
+        overflow-y: auto;
+    }
+    #panel.show { display: block; }
+    #panel h3 {
+        font-size: 11px;
+        margin-bottom: 8px;
+        margin-top: 4px;
+        opacity: 0.65;
+        font-weight: 600;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+    }
+    #panel h3:first-child { margin-top: 0; }
+
+    #panel label {
+        font-size: 12px;
+        opacity: 0.8;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+    }
+    #panel label .val {
+        color: #4facfe;
+        font-weight: 600;
+    }
+    #panel input[type=range] {
+        width: 100%;
+        accent-color: #4facfe;
+        margin-bottom: 10px;
+    }
+
+    .divider {
+        height: 1px;
+        background: rgba(255,255,255,0.1);
+        margin: 12px 0;
+    }
+
+    .row-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 12px;
+        opacity: 0.9;
+    }
+    .switch {
+        position: relative;
+        width: 40px;
+        height: 22px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 11px;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+    }
+    .switch::after {
+        content: '';
+        position: absolute;
+        top: 2px; left: 2px;
+        width: 18px; height: 18px;
+        background: white;
+        border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .switch.on { background: #4facfe; }
+    .switch.on::after { transform: translateX(18px); }
+
+    .limit-block {
+        opacity: 0.4;
+        pointer-events: none;
+        transition: opacity 0.2s;
+    }
+    .limit-block.enabled {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .tex-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 8px;
+    }
+
+    .tex-card .tex-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #4facfe;
+        margin-bottom: 5px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .tex-card .tex-title::before {
+        content: '🖼️';
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    .tex-card .tex-thumb {
+        width: 100%;
+        height: 42px;
+        border-radius: 6px;
+        background-size: cover;
+        background-position: center;
+        background-color: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: rgba(255,255,255,0.35);
+        margin-bottom: 6px;
+    }
+
+    .upload-btn {
+        width: 100%;
+        padding: 7px;
+        border-radius: 6px;
+        border: 1px dashed rgba(79,172,254,0.5);
+        background: rgba(79,172,254,0.1);
+        color: #4facfe;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .upload-btn:active { background: rgba(79,172,254,0.25); }
+
+    #fillBtn {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        margin-top: 5px;
+        border: 1px solid rgba(80,220,120,0.5);
+        background: rgba(60,200,100,0.15);
+        color: #7dffa8;
+        font-weight: 600;
+    }
+    #fillBtn:active { background: rgba(60,200,100,0.35); }
+
+    #resetBtn, #resetPaintBtn, #exportBtn {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        margin-top: 5px;
+    }
+    #resetBtn {
+        border: 1px solid rgba(255,100,100,0.4);
+        background: rgba(255,80,80,0.15);
+        color: #ff9999;
+    }
+    #resetPaintBtn {
+        border: 1px solid rgba(255,180,100,0.4);
+        background: rgba(255,150,60,0.15);
+        color: #ffbb77;
+    }
+    #exportBtn {
+        border: 1px solid rgba(80,220,120,0.5);
+        background: rgba(60,200,100,0.2);
+        color: #7dffa8;
+        font-weight: 700;
+        margin-top: 10px;
+    }
+    #exportBtn:active { background: rgba(60,200,100,0.4); }
+    #exportBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .res-select {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+    .res-select button {
+        flex: 1;
+        padding: 6px;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,0.15);
+        background: rgba(255,255,255,0.05);
+        color: #ccc;
+        font-size: 11px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .res-select button.active {
+        background: rgba(79,172,254,0.3);
+        border-color: #4facfe;
+        color: white;
+    }
+
+    /* ==== HINT: muncul sejenak lalu fade out ==== */
+    #hint {
+        position: fixed;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+        left: 50%;
+        transform: translateX(-50%) translateY(6px);
+        color: white;
+        font-size: 11px;
+        opacity: 0;
+        background: rgba(0,0,0,0.55);
+        padding: 6px 14px;
+        border-radius: 20px;
+        pointer-events: none;
+        z-index: 10;
+        white-space: nowrap;
+        max-width: calc(100vw - 28px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
+        transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    #hint.show {
+        opacity: 0.85;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    #brushPreview {
+        position: fixed;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 55px);
+        left: 15px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.4);
+        background-color: rgba(79,172,254,0.3);
+        background-size: cover;
+        background-position: center;
+        z-index: 15;
+        display: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    #brushPreview.show { display: block; }
+
+    #toast {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.9);
+        background: rgba(20,20,30,0.95);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 12px;
+        border: 1px solid rgba(79,172,254,0.5);
+        font-size: 14px;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.25s;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        max-width: 80vw;
+        line-height: 1.4;
+    }
+    #toast.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    @media (max-height: 600px) {
+        #hint { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+        #brushPreview { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px); }
+    }
+</style>
+</head>
+<body>
+
+<div id="modeBar">
+    <button id="mSculpt" class="active">🎨</button>
+    <button id="mPaint">🖌️</button>
+    <button id="upBtn" class="active" data-dir="up">⬆️</button>
+    <button id="downBtn" data-dir="down">⬇️</button>
+    <button id="smoothBtn" data-dir="smooth">✨</button>
+    <button id="gestureBtn" title="Mode Kamera">👆</button>
+    <button id="gearBtn" title="Pengaturan">⚙️</button>
+</div>
+
+<div id="panel">
+    <div id="sculptPanel">
+        <h3>Mode Sculpt</h3>
+
+        <label>Ukuran Kuas <span class="val" id="brushVal">5.0</span></label>
+        <input type="range" id="brushSize" min="1.0" max="50" step="0.5" value="5">
+
+        <label>Kekuatan <span class="val" id="strengthVal">0.50</span></label>
+        <input type="range" id="strength" min="0.1" max="1.5" step="0.05" value="0.5">
+
+        <div class="divider"></div>
+
+        <h3>Batas Ketinggian</h3>
+        <div class="row-toggle">
+            <span>🔒 Aktifkan Limit</span>
+            <div class="switch" id="limitSwitch"></div>
+        </div>
+
+        <div class="limit-block" id="limitBlock">
+            <label>Ketinggian Maks <span class="val" id="maxHeightVal">10.0</span></label>
+            <input type="range" id="maxHeight" min="1" max="25" step="0.5" value="10">
+
+            <label>Ketinggian Min <span class="val" id="minHeightVal">-10.0</span></label>
+            <input type="range" id="minHeight" min="-25" max="-1" step="0.5" value="-10">
+        </div>
+
+        <button id="resetBtn">🔄 Reset Tanah</button>
+    </div>
+
+    <div id="paintPanel" style="display:none;">
+        <h3>Mode Paint (Tekstur)</h3>
+
+        <label>Ukuran Kuas <span class="val" id="paintSizeVal">8.0</span></label>
+        <input type="range" id="paintSize" min="1.0" max="50" step="0.5" value="8">
+
+        <label>Opacity <span class="val" id="paintOpacityVal">0.8</span></label>
+        <input type="range" id="paintOpacity" min="0.1" max="1" step="0.05" value="0.8">
+
+        <label>Kekerasan (Hardness) <span class="val" id="paintHardnessVal">0.50</span></label>
+        <input type="range" id="paintHardness" min="0" max="1" step="0.05" value="0.5">
+
+        <div class="divider"></div>
+
+        <h3>Tekstur Tanah</h3>
+        <div class="tex-card">
+            <div class="tex-title" id="texTitle">Belum ada gambar</div>
+            <div class="tex-thumb" id="texThumb">Kosong</div>
+            <button class="upload-btn" id="uploadBtn">📷 Pilih Gambar</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none;">
+
+        <label>Kepadatan (Tile) <span class="val" id="texTileVal">4</span></label>
+        <input type="range" id="texTile" min="1" max="100" step="1" value="4">
+
+        <button id="fillBtn">🖼️ Isi Seluruh Tanah</button>
+
+        <div class="divider"></div>
+
+        <div class="row-toggle">
+            <span>🧗 Anti-Stretch (Tebing)</span>
+            <div class="switch" id="stretchSwitch"></div>
+        </div>
+
+        <button id="resetPaintBtn">🔄 Reset Tekstur Tanah</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3>Export Objek</h3>
+    <label style="font-size:11px;opacity:0.7;display:block;margin-bottom:6px;">
+        Simpan .obj + .mtl + .png
+    </label>
+
+    <div style="font-size:11px;opacity:0.7;margin-bottom:4px;">Resolusi Tekstur</div>
+    <div class="res-select" id="resSelect">
+        <button data-res="1024">1K</button>
+        <button data-res="2048" class="active">2K</button>
+        <button data-res="4096">4K</button>
+    </div>
+
+    <button id="exportBtn">📁 Simpan ke Folder</button>
+</div>
+
+<div id="brushPreview"></div>
+
+<div id="hint"></div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ============ TOAST ============
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+const TOAST_DURATION = 1800;
+const TOAST_MAX      = 2000;
+
+function showToast(msg, duration = TOAST_DURATION) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    const d = Math.min(duration, TOAST_MAX);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), d);
+}
+
+// ============ SETUP ============
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a20);
+scene.fog = new THREE.FogExp2(0x0a0a20, 0.008);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 500);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+document.body.appendChild(renderer.domElement);
+
+// ============ CAHAYA ============
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(20, 40, 20);
+scene.add(dirLight);
+
+const fillLight = new THREE.DirectionalLight(0xaaccff, 0.3);
+fillLight.position.set(-20, -30, -20);
+scene.add(fillLight);
+
+// ============ TEXTURE CANVAS ============
+const TEX_RES = 2048;
+
+const paintCanvas = document.createElement('canvas');
+paintCanvas.width = TEX_RES;
+paintCanvas.height = TEX_RES;
+const paintCtx = paintCanvas.getContext('2d', { willReadFrequently: false });
+
+const DEFAULT_COLOR = '#4a7ab5';
+paintCtx.fillStyle = DEFAULT_COLOR;
+paintCtx.fillRect(0, 0, TEX_RES, TEX_RES);
+
+const terrainTexture = new THREE.CanvasTexture(paintCanvas);
+terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
+terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
+terrainTexture.minFilter = THREE.LinearFilter;
+terrainTexture.magFilter = THREE.LinearFilter;
+terrainTexture.anisotropy = 4;
+terrainTexture.generateMipmaps = false;
+
+// Brush stamp canvas (untuk masking radial)
+const brushCanvas = document.createElement('canvas');
+const brushCtx = brushCanvas.getContext('2d');
+
+// ============ TERRAIN ============
+const SIZE = 60;
+const SEG = 128;
+const GRID = SEG + 1;
+
+const geometry = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+geometry.rotateX(-Math.PI / 2);
+
+const material = new THREE.MeshStandardMaterial({
+    map: terrainTexture,
+    color: 0xffffff,
+    roughness: 0.85,
+    metalness: 0.05,
+    side: THREE.DoubleSide
+});
+
+const terrain = new THREE.Mesh(geometry, material);
+scene.add(terrain);
+
+const posAttr = geometry.attributes.position;
+const vertexArray = posAttr.array;
+const totalVertices = posAttr.count;
+
+const vX = new Float32Array(totalVertices);
+const vZ = new Float32Array(totalVertices);
+for (let i = 0; i < totalVertices; i++) {
+    vX[i] = vertexArray[i * 3];
+    vZ[i] = vertexArray[i * 3 + 2];
+}
+
+const normals = new Float32Array(totalVertices);
+function updateNormalsCache() {
+    const nAttr = geometry.attributes.normal;
+    for (let i = 0; i < totalVertices; i++) {
+        normals[i] = nAttr.getY(i);
+    }
+}
+
+// ============ KAMERA ============
+const cameraState = {
+    target: new THREE.Vector3(0, 0, 0),
+    theta: Math.PI / 4,
+    phi: Math.PI / 3.5,
+    distance: 55
+};
+
+function updateCamera() {
+    const sinPhi = Math.sin(cameraState.phi);
+    camera.position.x = cameraState.target.x + cameraState.distance * sinPhi * Math.sin(cameraState.theta);
+    camera.position.y = cameraState.target.y + cameraState.distance * Math.cos(cameraState.phi);
+    camera.position.z = cameraState.target.z + cameraState.distance * sinPhi * Math.cos(cameraState.theta);
+    camera.lookAt(cameraState.target);
+}
+updateCamera();
+
+// ============ STATE ============
+let currentMode = 'sculpt';
+let sculptDir = 'up';
+let brushSize = 5;
+let strength = 0.5;
+let limitEnabled = false;
+let maxHeight = 10;
+let minHeight = -10;
+
+let paintSize = 8;
+let paintOpacity = 0.8;
+let paintHardness = 0.5;
+
+let brushImage = null;
+let antiStretch = false;
+let texTile = 4;
+
+let exportRes = 2048;
+
+// ============ UI: GEAR ============
+const gearBtn = document.getElementById('gearBtn');
+const panel = document.getElementById('panel');
+const modeBar = document.getElementById('modeBar');
+
+function setPanelOpen(open) {
+    panel.classList.toggle('show', open);
+    gearBtn.classList.toggle('active', open);
+    positionPanel();
+}
+
+function positionPanel() {
+    const rect = modeBar.getBoundingClientRect();
+    panel.style.top = (rect.bottom + 8) + 'px';
+}
+
+gearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setPanelOpen(!panel.classList.contains('show'));
+});
+
+document.addEventListener('pointerdown', (e) => {
+    if (!panel.classList.contains('show')) return;
+    if (panel.contains(e.target)) return;
+    if (modeBar.contains(e.target)) return;
+    setPanelOpen(false);
+});
+
+addEventListener('resize', positionPanel);
+
+// ============ GESTURE MODE ============
+let gestureMode = false;
+const gestureBtn = document.getElementById('gestureBtn');
+
+// ============ UI: MODE BAR ============
+const mSculpt = document.getElementById('mSculpt');
+const mPaint = document.getElementById('mPaint');
+const sculptPanel = document.getElementById('sculptPanel');
+const paintPanel = document.getElementById('paintPanel');
+const hintEl = document.getElementById('hint');
+const brushPreview = document.getElementById('brushPreview');
+
+// ==== HINT: tampilkan sejenak lalu fade out otomatis ====
+let hintTimer = null;
+const HINT_SHOW_MS = 2500; // lama tampil (ms)
+
+function updateHint() {
+    // 1. Set teks
+    if (gestureMode) {
+        hintEl.textContent = '👆 1 jari: orbit · 2 jari: zoom & geser';
+    } else if (currentMode === 'sculpt') {
+        hintEl.textContent = sculptDir === 'smooth'
+            ? '✨ Sentuh & geser untuk menghaluskan permukaan'
+            : '🎨 Sentuh tanah untuk sculpt · Aktifkan 👆 untuk kamera';
+    } else {
+        hintEl.textContent = brushImage
+            ? '🖌️ Sentuh tanah untuk melukis tekstur'
+            : '🖌️ Upload gambar dulu di ⚙️ → Paint';
+    }
+
+    // 2. Tampilkan, lalu sembunyikan otomatis setelah HINT_SHOW_MS
+    hintEl.classList.add('show');
+    if (hintTimer) clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => {
+        hintEl.classList.remove('show');
+    }, HINT_SHOW_MS);
+}
+
+function setMode(m) {
+    currentMode = m;
+    mSculpt.classList.toggle('active', m === 'sculpt');
+    mPaint.classList.toggle('active', m === 'paint');
+    sculptPanel.style.display = m === 'sculpt' ? 'block' : 'none';
+    paintPanel.style.display = m === 'paint' ? 'block' : 'none';
+    updateBrushPreview();
+    updateHint();
+}
+mSculpt.addEventListener('click', () => setMode('sculpt'));
+mPaint.addEventListener('click', () => setMode('paint'));
+
+// ============ UI: SCULPT ============
+const upBtn = document.getElementById('upBtn');
+const downBtn = document.getElementById('downBtn');
+const smoothBtn = document.getElementById('smoothBtn');
+
+function setSculptDir(dir) {
+    sculptDir = dir;
+    upBtn.classList.toggle('active', dir === 'up');
+    downBtn.classList.toggle('active', dir === 'down');
+    smoothBtn.classList.toggle('active', dir === 'smooth');
+    updateHint();
+}
+
+upBtn.addEventListener('click', () => setSculptDir('up'));
+downBtn.addEventListener('click', () => setSculptDir('down'));
+smoothBtn.addEventListener('click', () => setSculptDir('smooth'));
+
+const brushSlider = document.getElementById('brushSize');
+const brushVal = document.getElementById('brushVal');
+brushSlider.addEventListener('input', e => {
+    brushSize = parseFloat(e.target.value);
+    brushVal.textContent = brushSize.toFixed(1);
+});
+
+const strengthSlider = document.getElementById('strength');
+const strengthVal = document.getElementById('strengthVal');
+strengthSlider.addEventListener('input', e => {
+    strength = parseFloat(e.target.value);
+    strengthVal.textContent = strength.toFixed(2);
+});
+
+// ============ UI: LIMIT ============
+const limitSwitch = document.getElementById('limitSwitch');
+const limitBlock = document.getElementById('limitBlock');
+const maxSlider = document.getElementById('maxHeight');
+const maxVal = document.getElementById('maxHeightVal');
+const minSlider = document.getElementById('minHeight');
+const minVal = document.getElementById('minHeightVal');
+
+limitSwitch.addEventListener('click', () => {
+    limitEnabled = !limitEnabled;
+    limitSwitch.classList.toggle('on', limitEnabled);
+    limitBlock.classList.toggle('enabled', limitEnabled);
+});
+
+maxSlider.addEventListener('input', e => {
+    maxHeight = parseFloat(e.target.value);
+    if (maxHeight <= minHeight + 1) { maxHeight = minHeight + 1; maxSlider.value = maxHeight; }
+    maxVal.textContent = maxHeight.toFixed(1);
+});
+
+minSlider.addEventListener('input', e => {
+    minHeight = parseFloat(e.target.value);
+    if (minHeight >= maxHeight - 1) { minHeight = maxHeight - 1; minSlider.value = minHeight; }
+    minVal.textContent = minHeight.toFixed(1);
+});
+
+// ============ UI: PAINT ============
+const paintSizeSlider = document.getElementById('paintSize');
+const paintSizeVal = document.getElementById('paintSizeVal');
+paintSizeSlider.addEventListener('input', e => {
+    paintSize = parseFloat(e.target.value);
+    paintSizeVal.textContent = paintSize.toFixed(1);
+    updateBrushPreview();
+});
+
+const paintOpacitySlider = document.getElementById('paintOpacity');
+const paintOpacityVal = document.getElementById('paintOpacityVal');
+paintOpacitySlider.addEventListener('input', e => {
+    paintOpacity = parseFloat(e.target.value);
+    paintOpacityVal.textContent = paintOpacity.toFixed(2);
+});
+
+const paintHardnessSlider = document.getElementById('paintHardness');
+const paintHardnessVal = document.getElementById('paintHardnessVal');
+paintHardnessSlider.addEventListener('input', e => {
+    paintHardness = parseFloat(e.target.value);
+    paintHardnessVal.textContent = paintHardness.toFixed(2);
+});
+
+// ============ UI: TILE ============
+const texTileSlider = document.getElementById('texTile');
+const texTileVal = document.getElementById('texTileVal');
+texTileSlider.addEventListener('input', e => {
+    texTile = parseFloat(e.target.value);
+    texTileVal.textContent = texTile;
+    updateBrushPreview();
+});
+
+// ============ UI: STRETCH SWITCH ============
+const stretchSwitch = document.getElementById('stretchSwitch');
+stretchSwitch.addEventListener('click', () => {
+    antiStretch = !antiStretch;
+    stretchSwitch.classList.toggle('on', antiStretch);
+    recomputeAdaptiveUV();
+});
+
+// ============ UI: RESOLUSI EXPORT ============
+const resButtons = document.querySelectorAll('#resSelect button');
+resButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        resButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        exportRes = parseInt(btn.dataset.res);
+    });
+});
+
+// ============ UI: UPLOAD ============
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
+const texTitle = document.getElementById('texTitle');
+const texThumb = document.getElementById('texThumb');
+
+uploadBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        const img = new Image();
+        img.onload = () => {
+            brushImage = img;
+
+            const name = file.name.replace(/\.[^/.]+$/, '');
+            texTitle.textContent = name || 'Tekstur';
+            texThumb.textContent = '';
+            texThumb.style.backgroundImage = `url(${evt.target.result})`;
+            texThumb.style.color = 'transparent';
+
+            updateBrushPreview();
+            if (currentMode !== 'paint') setMode('paint');
+            updateHint();
+            showToast('🖌️ Gambar siap dipakai.\nLukis di tanah, atau klik "Isi Seluruh Tanah".', 2800);
+        };
+        img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+});
+
+// ============ FILL TERRAIN WITH IMAGE (TILE) ============
+function fillTerrainWithImage(img) {
+    paintCtx.fillStyle = DEFAULT_COLOR;
+    paintCtx.fillRect(0, 0, TEX_RES, TEX_RES);
+
+    const tileCount = Math.max(1, Math.round(texTile));
+    const tileSize = TEX_RES / tileCount;
+
+    const scaled = document.createElement('canvas');
+    scaled.width = Math.ceil(tileSize);
+    scaled.height = Math.ceil(tileSize);
+    scaled.getContext('2d').drawImage(img, 0, 0, scaled.width, scaled.height);
+
+    const pattern = paintCtx.createPattern(scaled, 'repeat');
+    paintCtx.fillStyle = pattern;
+    paintCtx.fillRect(0, 0, TEX_RES, TEX_RES);
+
+    terrainTexture.needsUpdate = true;
+}
+
+document.getElementById('fillBtn').addEventListener('click', () => {
+    if (!brushImage) {
+        showToast('Upload gambar dulu');
+        return;
+    }
+    fillTerrainWithImage(brushImage);
+    showToast('🖼️ Gambar diisi ke seluruh tanah (' + texTile + '×' + texTile + ')', 1800);
+});
+
+// ============ PREVIEW KUAS (TILE) ============
+function updateBrushPreview() {
+    if (currentMode !== 'paint' || !brushImage) {
+        brushPreview.classList.remove('show');
+        return;
+    }
+    brushPreview.classList.add('show');
+    const displaySize = Math.min(80, paintSize * 3);
+    brushPreview.style.width = displaySize + 'px';
+    brushPreview.style.height = displaySize + 'px';
+
+    const c = document.createElement('canvas');
+    c.width = displaySize;
+    c.height = displaySize;
+    const cx = c.getContext('2d');
+    const tileCount = Math.max(1, Math.round(texTile));
+    const tileSize = displaySize / tileCount;
+    for (let y = 0; y < displaySize; y += tileSize) {
+        for (let x = 0; x < displaySize; x += tileSize) {
+            cx.drawImage(brushImage, x, y, tileSize, tileSize);
+        }
+    }
+    brushPreview.style.backgroundImage = `url(${c.toDataURL()})`;
+}
+
+// ============ RESET ============
+document.getElementById('resetBtn').addEventListener('click', () => {
+    for (let i = 0; i < totalVertices; i++) vertexArray[i * 3 + 1] = 0;
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    updateNormalsCache();
+    recomputeAdaptiveUV();
+});
+
+document.getElementById('resetPaintBtn').addEventListener('click', () => {
+    paintCtx.fillStyle = DEFAULT_COLOR;
+    paintCtx.fillRect(0, 0, TEX_RES, TEX_RES);
+    terrainTexture.needsUpdate = true;
+    showToast('🔄 Tekstur tanah di-reset');
+});
+
+// ============ RAYCASTER ============
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function getTerrainHit(clientX, clientY) {
+    pointer.x = (clientX / innerWidth) * 2 - 1;
+    pointer.y = -(clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObject(terrain);
+    return hits.length > 0 ? hits[0] : null;
+}
+
+// ============ SCULPT ============
+function sculpt(clientX, clientY) {
+    const hit = getTerrainHit(clientX, clientY);
+    if (!hit) return;
+    const point = hit.point;
+
+    const radius = brushSize;
+    const r2 = radius * radius;
+
+    if (sculptDir === 'smooth') {
+        let sumY = 0;
+        let sumW = 0;
+
+        for (let i = 0; i < totalVertices; i++) {
+            const dx = vX[i] - point.x;
+            const dz = vZ[i] - point.z;
+            const d2 = dx*dx + dz*dz;
+            if (d2 > r2) continue;
+
+            const t = 1 - Math.sqrt(d2) / radius;
+            sumY += vertexArray[i * 3 + 1] * t;
+            sumW += t;
+        }
+
+        if (sumW < 0.0001) return;
+        const avgY = sumY / sumW;
+
+        for (let i = 0; i < totalVertices; i++) {
+            const dx = vX[i] - point.x;
+            const dz = vZ[i] - point.z;
+            const d2 = dx*dx + dz*dz;
+            if (d2 > r2) continue;
+
+            const t = 1 - Math.sqrt(d2) / radius;
+            const curY = vertexArray[i * 3 + 1];
+            const lerpAmount = Math.min(1, strength * t * 0.5);
+            let newY = curY + (avgY - curY) * lerpAmount;
+
+            if (limitEnabled) {
+                if (newY > maxHeight) newY = maxHeight;
+                else if (newY < minHeight) newY = minHeight;
+            }
+
+            vertexArray[i * 3 + 1] = newY;
+        }
+
+    } else {
+        const dir = sculptDir === 'up' ? 1 : -1;
+
+        for (let i = 0; i < totalVertices; i++) {
+            const dx = vX[i] - point.x;
+            const dz = vZ[i] - point.z;
+            const d2 = dx*dx + dz*dz;
+            if (d2 > r2) continue;
+
+            const falloff = 1 - Math.sqrt(d2) / radius;
+            let newY = vertexArray[i * 3 + 1] + dir * strength * falloff;
+
+            if (limitEnabled) {
+                if (newY > maxHeight) newY = maxHeight;
+                else if (newY < minHeight) newY = minHeight;
+            }
+
+            vertexArray[i * 3 + 1] = newY;
+        }
+    }
+
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    updateNormalsCache();
+    recomputeAdaptiveUV();
+}
+
+// ============ UV ADAPTIVE (Anti-Stretch) ============
+const uvAttr = geometry.attributes.uv;
+const uvArray = uvAttr.array;
+
+const uvBaseX = new Float32Array(totalVertices);
+const uvBaseY = new Float32Array(totalVertices);
+for (let i = 0; i < totalVertices; i++) {
+    uvBaseX[i] = uvArray[i * 2];
+    uvBaseY[i] = uvArray[i * 2 + 1];
+}
+
+function recomputeAdaptiveUV() {
+    if (!antiStretch) {
+        for (let i = 0; i < totalVertices; i++) {
+            uvArray[i * 2] = uvBaseX[i];
+            uvArray[i * 2 + 1] = uvBaseY[i];
+        }
+    } else {
+        for (let i = 0; i < totalVertices; i++) {
+            const ny = Math.abs(normals[i]);
+            const clampNY = Math.max(ny, 0.15);
+            uvArray[i * 2] = uvBaseX[i] * clampNY;
+            uvArray[i * 2 + 1] = uvBaseY[i] * clampNY;
+        }
+    }
+    uvAttr.needsUpdate = true;
+}
+
+// ============ PAINT (STAMP KE CANVAS, IKUT TILE) ============
+function stampBrush(cx, cy, radiusPx) {
+    if (!brushImage) return;
+
+    const size = Math.max(4, Math.round(radiusPx * 2));
+    brushCanvas.width = size;
+    brushCanvas.height = size;
+    brushCtx.clearRect(0, 0, size, size);
+
+    const tileCount = Math.max(1, Math.round(texTile));
+    const tileSize = TEX_RES / tileCount;
+    const halfSize = size / 2;
+    const srcX = cx - halfSize;
+    const srcY = cy - halfSize;
+
+    const mod = (a, n) => ((a % n) + n) % n;
+    const startX = -mod(srcX, tileSize);
+    const startY = -mod(srcY, tileSize);
+
+    for (let y = startY; y < size; y += tileSize) {
+        for (let x = startX; x < size; x += tileSize) {
+            brushCtx.drawImage(brushImage, x, y, tileSize, tileSize);
+        }
+    }
+
+    const inner = Math.max(0, Math.min(0.95, paintHardness));
+    const grd = brushCtx.createRadialGradient(halfSize, halfSize, 0, halfSize, halfSize, halfSize);
+    grd.addColorStop(0, 'rgba(0,0,0,1)');
+    grd.addColorStop(inner, 'rgba(0,0,0,1)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+
+    brushCtx.globalCompositeOperation = 'destination-in';
+    brushCtx.fillStyle = grd;
+    brushCtx.fillRect(0, 0, size, size);
+    brushCtx.globalCompositeOperation = 'source-over';
+
+    paintCtx.globalAlpha = paintOpacity;
+    paintCtx.drawImage(brushCanvas, cx - halfSize, cy - halfSize);
+    paintCtx.globalAlpha = 1;
+
+    terrainTexture.needsUpdate = true;
+}
+
+function paint(clientX, clientY) {
+    if (!brushImage) return;
+
+    const hit = getTerrainHit(clientX, clientY);
+    if (!hit || !hit.uv) return;
+
+    let uvx = hit.uv.x;
+    let uvy = hit.uv.y;
+    if (uvx < 0) uvx = 0; else if (uvx > 1) uvx = 1;
+    if (uvy < 0) uvy = 0; else if (uvy > 1) uvy = 1;
+
+    const px = uvx * TEX_RES;
+    const py = (1 - uvy) * TEX_RES;
+
+    const radiusPx = (paintSize / SIZE) * TEX_RES;
+
+    stampBrush(px, py, radiusPx);
+}
+
+// ============ EXPORT ============
+function getExportTextureCanvas(resolution) {
+    const canvas = document.createElement('canvas');
+    canvas.width = resolution;
+    canvas.height = resolution;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(paintCanvas, 0, 0, resolution, resolution);
+    return canvas;
+}
+
+function fixNormalsUpward() {
+    const nAttr = geometry.attributes.normal;
+    const nArr = nAttr.array;
+    let fixed = 0;
+
+    for (let i = 0; i < totalVertices; i++) {
+        const nx = nArr[i * 3];
+        const ny = nArr[i * 3 + 1];
+        const nz = nArr[i * 3 + 2];
+
+        if (ny < 0) {
+            nArr[i * 3] = -nx;
+            nArr[i * 3 + 1] = -ny;
+            nArr[i * 3 + 2] = -nz;
+            fixed++;
+        } else if (ny === 0 && nx === 0 && nz === 0) {
+            nArr[i * 3] = 0;
+            nArr[i * 3 + 1] = 1;
+            nArr[i * 3 + 2] = 0;
+            fixed++;
+        }
+    }
+
+    if (fixed > 0) nAttr.needsUpdate = true;
+    return fixed;
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 1000);
+}
+
+async function saveToFolder() {
+    const btn = document.getElementById('exportBtn');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Menyiapkan tekstur...';
+    showToast('⏳ Export tekstur ' + (exportRes/1024) + 'K...', 3000);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    try {
+        geometry.computeVertexNormals();
+        fixNormalsUpward();
+
+        const bakeCanvas = getExportTextureCanvas(exportRes);
+        const bakeBlob = await new Promise(res => bakeCanvas.toBlob(res, 'image/png'));
+
+        const pos = geometry.attributes.position.array;
+        const nrm = geometry.attributes.normal.array;
+        const uvArr = geometry.attributes.uv.array;
+
+        let objText = '';
+        objText += '# Terrain 3D Export\n';
+        objText += `# Vertices: ${totalVertices}\n`;
+        objText += `# Texture: ${exportRes}x${exportRes}\n\n`;
+        objText += 'mtllib terrain.mtl\n\n';
+        objText += 'o Terrain\n\n';
+
+        objText += '# Vertices\n';
+        for (let i = 0; i < totalVertices; i++) {
+            objText += `v ${pos[i*3].toFixed(4)} ${pos[i*3+1].toFixed(4)} ${pos[i*3+2].toFixed(4)}\n`;
+        }
+
+        objText += '\n# Texture Coordinates\n';
+        for (let i = 0; i < totalVertices; i++) {
+            objText += `vt ${uvArr[i*2].toFixed(6)} ${uvArr[i*2+1].toFixed(6)}\n`;
+        }
+
+        objText += '\n# Normals\n';
+        for (let i = 0; i < totalVertices; i++) {
+            objText += `vn ${nrm[i*3].toFixed(4)} ${nrm[i*3+1].toFixed(4)} ${nrm[i*3+2].toFixed(4)}\n`;
+        }
+
+        objText += '\n# Faces\n';
+        objText += 'g TerrainMesh\n';
+        objText += 'usemtl TerrainMaterial\n';
+        objText += 's off\n';
+
+        for (let y = 0; y < SEG; y++) {
+            for (let x = 0; x < SEG; x++) {
+                const a = y * GRID + x + 1;
+                const b = y * GRID + x + 2;
+                const c = (y + 1) * GRID + x + 2;
+                const d = (y + 1) * GRID + x + 1;
+
+                objText += `f ${a}/${a}/${a} ${d}/${d}/${d} ${c}/${c}/${c}\n`;
+                objText += `f ${a}/${a}/${a} ${c}/${c}/${c} ${b}/${b}/${b}\n`;
+            }
+        }
+
+        let mtlText = '';
+        mtlText += '# Terrain 3D Material\n';
+        mtlText += 'newmtl TerrainMaterial\n';
+        mtlText += 'Ka 0.400 0.400 0.400\n';
+        mtlText += 'Kd 1.000 1.000 1.000\n';
+        mtlText += 'Ks 0.000 0.000 0.000\n';
+        mtlText += 'Ns 10.0\n';
+        mtlText += 'd 1.0\n';
+        mtlText += 'illum 2\n';
+        mtlText += 'map_Kd texture.png\n';
+
+        const supportsFS = ('showDirectoryPicker' in window);
+
+        if (supportsFS) {
+            btn.textContent = '📂 Pilih folder...';
+            try {
+                const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+                btn.textContent = '💾 Menulis file...';
+
+                const objFh = await dirHandle.getFileHandle('terrain.obj', { create: true });
+                const objW = await objFh.createWritable();
+                await objW.write(objText);
+                await objW.close();
+
+                const mtlFh = await dirHandle.getFileHandle('terrain.mtl', { create: true });
+                const mtlW = await mtlFh.createWritable();
+                await mtlW.write(mtlText);
+                await mtlW.close();
+
+                const texFh = await dirHandle.getFileHandle('texture.png', { create: true });
+                const texW = await texFh.createWritable();
+                await texW.write(bakeBlob);
+                await texW.close();
+
+                btn.textContent = '✅ Tersimpan!';
+                showToast('✅ Tersimpan ke folder:\n"' + dirHandle.name + '"', 3000);
+
+                setTimeout(() => {
+                    btn.textContent = '📁 Simpan ke Folder';
+                    btn.disabled = false;
+                }, 1800);
+                return;
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    btn.textContent = '📁 Simpan ke Folder';
+                    btn.disabled = false;
+                    return;
+                }
+                console.warn('Gagal simpan ke folder, fallback ke download:', err);
+            }
+        }
+
+        btn.textContent = '💾 Mengunduh...';
+        showToast('💾 Mengunduh file...', 2500);
+
+        const ts = Date.now();
+        downloadBlob(new Blob([objText], { type: 'text/plain' }), `terrain_${ts}.obj`);
+        await new Promise(r => setTimeout(r, 300));
+        downloadBlob(new Blob([mtlText], { type: 'text/plain' }), `terrain_${ts}.mtl`);
+        await new Promise(r => setTimeout(r, 300));
+        downloadBlob(bakeBlob, `texture_${ts}.png`);
+
+        btn.textContent = '✅ Terunduh!';
+        showToast('✅ 3 file terunduh ke folder Download.', 3500);
+
+        setTimeout(() => {
+            btn.textContent = '📁 Simpan ke Folder';
+            btn.disabled = false;
+        }, 2000);
+
+    } catch (err) {
+        console.error('Export error:', err);
+        btn.textContent = '❌ Gagal';
+        showToast('❌ Gagal: ' + err.message, 3000);
+        setTimeout(() => {
+            btn.textContent = '📁 Simpan ke Folder';
+            btn.disabled = false;
+        }, 2000);
+    }
+}
+
+document.getElementById('exportBtn').addEventListener('click', saveToFolder);
+
+// ============ KAMERA CONTROL ============
+function doOrbit(dx, dy) {
+    cameraState.theta -= dx * 0.008;
+    cameraState.phi = Math.max(0.15, Math.min(Math.PI / 2.05, cameraState.phi - dy * 0.008));
+    updateCamera();
+}
+
+function doPan(dx, dy) {
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3();
+    right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+    const panSpeed = cameraState.distance * 0.002;
+    cameraState.target.x -= right.x * dx * panSpeed;
+    cameraState.target.z -= right.z * dx * panSpeed;
+    cameraState.target.x += forward.x * dy * panSpeed;
+    cameraState.target.z += forward.z * dy * panSpeed;
+    updateCamera();
+}
+
+function doZoom(dy) {
+    cameraState.distance = Math.max(10, Math.min(150, cameraState.distance + dy * 0.4));
+    updateCamera();
+}
+
+// ============ DRAG HANDLER ============
+let dragging = false;
+let dragMode = null;
+let lastX = 0, lastY = 0;
+
+function startDrag(mode, x, y) {
+    dragging = true;
+    dragMode = mode;
+    lastX = x;
+    lastY = y;
+    if (mode === 'sculpt') sculpt(x, y);
+    if (mode === 'paint') paint(x, y);
+}
+
+function moveDrag(x, y) {
+    if (!dragging) return;
+    const dx = x - lastX;
+    const dy = y - lastY;
+    lastX = x;
+    lastY = y;
+
+    if (dragMode === 'sculpt') sculpt(x, y);
+    else if (dragMode === 'paint') paint(x, y);
+    else if (dragMode === 'orbit') doOrbit(dx, dy);
+    else if (dragMode === 'pan') doPan(dx, dy);
+    else if (dragMode === 'zoom') doZoom(dy);
+}
+
+function endDrag() {
+    dragging = false;
+    dragMode = null;
+}
+
+// ============ MOUSE GLOBAL ============
+window.addEventListener('mousemove', (e) => {
+    if (dragging) moveDrag(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', endDrag);
+
+// ============ GESTURE STATE ============
+const activeTouches = new Map();
+let lastTouchCenter = { x: 0, y: 0 };
+let lastTouchDist = 0;
+
+function getTouchCenterAndDist() {
+    const t = Array.from(activeTouches.values());
+    if (t.length === 0) return { center: { x: 0, y: 0 }, dist: 0 };
+    if (t.length === 1) return { center: { x: t[0].x, y: t[0].y }, dist: 0 };
+    const dx = t[1].x - t[0].x;
+    const dy = t[1].y - t[0].y;
+    return {
+        center: { x: (t[0].x + t[1].x) / 2, y: (t[0].y + t[1].y) / 2 },
+        dist: Math.hypot(dx, dy)
+    };
+}
+
+gestureBtn.addEventListener('click', () => {
+    gestureMode = !gestureMode;
+    gestureBtn.classList.toggle('active', gestureMode);
+    activeTouches.clear();
+    updateHint();
+});
+
+// ============ LISTENER CANVAS ============
+renderer.domElement.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+
+    if (gestureMode) {
+        for (const t of e.changedTouches) {
+            activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+        }
+        const { center, dist } = getTouchCenterAndDist();
+        lastTouchCenter = center;
+        lastTouchDist = dist;
+        return;
+    }
+
+    const t = e.changedTouches[0];
+    const action = currentMode === 'paint' ? 'paint' : 'sculpt';
+    startDrag(action, t.clientX, t.clientY);
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+
+    if (gestureMode) {
+        for (const t of e.changedTouches) {
+            activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+        }
+        const { center, dist } = getTouchCenterAndDist();
+        const count = activeTouches.size;
+
+        if (count === 1) {
+            doOrbit(center.x - lastTouchCenter.x, center.y - lastTouchCenter.y);
+        } else if (count >= 2) {
+            if (lastTouchDist > 0) {
+                doZoom((lastTouchDist - dist) * 0.6);
+            }
+            doPan(center.x - lastTouchCenter.x, center.y - lastTouchCenter.y);
+        }
+
+        lastTouchCenter = center;
+        lastTouchDist = dist;
+        return;
+    }
+
+    const t = e.changedTouches[0];
+    moveDrag(t.clientX, t.clientY);
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchend', (e) => {
+    e.preventDefault();
+
+    if (gestureMode) {
+        for (const t of e.changedTouches) {
+            activeTouches.delete(t.identifier);
+        }
+        const { center, dist } = getTouchCenterAndDist();
+        lastTouchCenter = center;
+        lastTouchDist = dist;
+        return;
+    }
+
+    endDrag();
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchcancel', (e) => {
+    if (gestureMode) {
+        activeTouches.clear();
+        lastTouchDist = 0;
+    } else {
+        endDrag();
+    }
+});
+
+renderer.domElement.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    if (gestureMode) {
+        startDrag('orbit', e.clientX, e.clientY);
+        return;
+    }
+    const action = currentMode === 'paint' ? 'paint' : 'sculpt';
+    startDrag(action, e.clientX, e.clientY);
+});
+
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+renderer.domElement.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    doZoom(e.deltaY * 0.1);
+}, { passive: false });
+
+// ============ INIT ============
+geometry.computeVertexNormals();
+fixNormalsUpward();
+updateNormalsCache();
+recomputeAdaptiveUV();
+updateHint();
+
+// ============ RENDER LOOP ============
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+}
+animate();
+
+// ============ RESIZE ============
+addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    positionPanel();
+});
+</script>
+</body>
+</html>
