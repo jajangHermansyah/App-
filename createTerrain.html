@@ -60,6 +60,13 @@
 
     #modeBar button:active { transform: scale(0.95); }
 
+    /* Undo/Redo disabled state */
+    #modeBar button:disabled {
+        opacity: 0.3;
+        box-shadow: none;
+    }
+    #modeBar button:disabled:active { transform: none; }
+
     #gestureBtn.active {
         background: #ffc83d !important;
         border-color: #ffc83d !important;
@@ -363,8 +370,10 @@
 <body>
 
 <div id="modeBar">
-    <button id="mSculpt" class="active">🎨</button>
+    <button id="mSculpt" class="active">🌏</button>
     <button id="mPaint">🖌️</button>
+    <button id="undoBtn" title="Undo" disabled>↩️</button>
+    <button id="redoBtn" title="Redo" disabled>↪️</button>
     <button id="upBtn" class="active" data-dir="up">⬆️</button>
     <button id="downBtn" data-dir="down">⬇️</button>
     <button id="smoothBtn" data-dir="smooth">✨</button>
@@ -651,10 +660,9 @@ const brushPreview = document.getElementById('brushPreview');
 
 // ==== HINT: tampilkan sejenak lalu fade out otomatis ====
 let hintTimer = null;
-const HINT_SHOW_MS = 2500; // lama tampil (ms)
+const HINT_SHOW_MS = 2500;
 
 function updateHint() {
-    // 1. Set teks
     if (gestureMode) {
         hintEl.textContent = '👆 1 jari: orbit · 2 jari: zoom & geser';
     } else if (currentMode === 'sculpt') {
@@ -667,12 +675,9 @@ function updateHint() {
             : '🖌️ Upload gambar dulu di ⚙️ → Paint';
     }
 
-    // 2. Tampilkan, lalu sembunyikan otomatis setelah HINT_SHOW_MS
     hintEl.classList.add('show');
     if (hintTimer) clearTimeout(hintTimer);
-    hintTimer = setTimeout(() => {
-        hintEl.classList.remove('show');
-    }, HINT_SHOW_MS);
+    hintTimer = setTimeout(() => hintEl.classList.remove('show'), HINT_SHOW_MS);
 }
 
 function setMode(m) {
@@ -854,6 +859,8 @@ document.getElementById('fillBtn').addEventListener('click', () => {
         return;
     }
     fillTerrainWithImage(brushImage);
+    paintDirty = true;
+    commitHistory();
     showToast('🖼️ Gambar diisi ke seluruh tanah (' + texTile + '×' + texTile + ')', 1800);
 });
 
@@ -889,13 +896,123 @@ document.getElementById('resetBtn').addEventListener('click', () => {
     geometry.computeVertexNormals();
     updateNormalsCache();
     recomputeAdaptiveUV();
+    commitHistory();
 });
 
 document.getElementById('resetPaintBtn').addEventListener('click', () => {
     paintCtx.fillStyle = DEFAULT_COLOR;
     paintCtx.fillRect(0, 0, TEX_RES, TEX_RES);
     terrainTexture.needsUpdate = true;
+    paintDirty = true;
+    commitHistory();
     showToast('🔄 Tekstur tanah di-reset');
+});
+
+// ============ UNDO / REDO ============
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+const history = [];          // daftar state (snapshot lengkap)
+let historyIndex = -1;       // posisi state saat ini di dalam history
+const MAX_HISTORY = 15;      // batas jumlah snapshot
+
+let lastPaintURL = null;     // cache PNG paint canvas terakhir
+let paintDirty   = false;    // true kalau canvas paint berubah sejak snapshot terakhir
+let isRestoring  = false;    // cegah undo/redo bertumpuk saat image masih loading
+
+function captureState() {
+    // 1. Snapshot sculpt (Y setiap vertex)
+    const y = new Float32Array(totalVertices);
+    for (let i = 0; i < totalVertices; i++) y[i] = vertexArray[i * 3 + 1];
+
+    // 2. Snapshot paint (PNG data URL, hemat memori via lazy caching)
+    let paintURL;
+    if (paintDirty || lastPaintURL === null) {
+        paintURL = paintCanvas.toDataURL('image/png');
+        lastPaintURL = paintURL;
+        paintDirty = false;
+    } else {
+        paintURL = lastPaintURL;
+    }
+    return { y, paintURL };
+}
+
+function commitHistory() {
+    // Buang state "redo" yang sudah tidak relevan
+    if (historyIndex < history.length - 1) {
+        history.length = historyIndex + 1;
+    }
+    history.push(captureState());
+    if (history.length > MAX_HISTORY) history.shift();
+    historyIndex = history.length - 1;
+    updateUndoRedoUI();
+}
+
+function restoreState(state) {
+    if (isRestoring) return;
+    isRestoring = true;
+
+    // Restore sculpt heights
+    for (let i = 0; i < totalVertices; i++) {
+        vertexArray[i * 3 + 1] = state.y[i];
+    }
+    posAttr.needsUpdate = true;
+    geometry.computeVertexNormals();
+    updateNormalsCache();
+    recomputeAdaptiveUV();
+
+    // Restore paint (async karena Image.src data URL)
+    const img = new Image();
+    img.onload = () => {
+        paintCtx.clearRect(0, 0, TEX_RES, TEX_RES);
+        paintCtx.drawImage(img, 0, 0, TEX_RES, TEX_RES);
+        terrainTexture.needsUpdate = true;
+        // Set cache ke state yang baru dipulihkan
+        lastPaintURL = state.paintURL;
+        paintDirty = false;
+        isRestoring = false;
+    };
+    img.onerror = () => { isRestoring = false; };
+    img.src = state.paintURL;
+}
+
+function updateUndoRedoUI() {
+    undoBtn.disabled = historyIndex <= 0;
+    redoBtn.disabled = historyIndex >= history.length - 1;
+}
+
+function undoAction() {
+    if (isRestoring) return;
+    if (historyIndex <= 0) return;
+    historyIndex--;
+    restoreState(history[historyIndex]);
+    updateUndoRedoUI();
+    showToast('↩️ Undo', 900);
+}
+
+function redoAction() {
+    if (isRestoring) return;
+    if (historyIndex >= history.length - 1) return;
+    historyIndex++;
+    restoreState(history[historyIndex]);
+    updateUndoRedoUI();
+    showToast('↪️ Redo', 900);
+}
+
+undoBtn.addEventListener('click', undoAction);
+redoBtn.addEventListener('click', redoAction);
+
+// Keyboard shortcut: Ctrl/Cmd + Z (undo), Ctrl/Cmd + Shift + Z / Ctrl + Y (redo)
+window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redoAction(); else undoAction();
+    } else if (k === 'y') {
+        e.preventDefault();
+        redoAction();
+    }
 });
 
 // ============ RAYCASTER ============
@@ -911,13 +1028,15 @@ function getTerrainHit(clientX, clientY) {
 }
 
 // ============ SCULPT ============
+// Return true kalau ada vertex yang berubah
 function sculpt(clientX, clientY) {
     const hit = getTerrainHit(clientX, clientY);
-    if (!hit) return;
+    if (!hit) return false;
     const point = hit.point;
 
     const radius = brushSize;
     const r2 = radius * radius;
+    let modified = false;
 
     if (sculptDir === 'smooth') {
         let sumY = 0;
@@ -934,7 +1053,7 @@ function sculpt(clientX, clientY) {
             sumW += t;
         }
 
-        if (sumW < 0.0001) return;
+        if (sumW < 0.0001) return false;
         const avgY = sumY / sumW;
 
         for (let i = 0; i < totalVertices; i++) {
@@ -953,6 +1072,7 @@ function sculpt(clientX, clientY) {
                 else if (newY < minHeight) newY = minHeight;
             }
 
+            if (newY !== curY) modified = true;
             vertexArray[i * 3 + 1] = newY;
         }
 
@@ -973,14 +1093,18 @@ function sculpt(clientX, clientY) {
                 else if (newY < minHeight) newY = minHeight;
             }
 
+            if (newY !== vertexArray[i * 3 + 1]) modified = true;
             vertexArray[i * 3 + 1] = newY;
         }
     }
+
+    if (!modified) return false;
 
     posAttr.needsUpdate = true;
     geometry.computeVertexNormals();
     updateNormalsCache();
     recomputeAdaptiveUV();
+    return true;
 }
 
 // ============ UV ADAPTIVE (Anti-Stretch) ============
@@ -1052,13 +1176,15 @@ function stampBrush(cx, cy, radiusPx) {
     paintCtx.globalAlpha = 1;
 
     terrainTexture.needsUpdate = true;
+    paintDirty = true;
 }
 
+// Return true kalau brush berhasil dicap
 function paint(clientX, clientY) {
-    if (!brushImage) return;
+    if (!brushImage) return false;
 
     const hit = getTerrainHit(clientX, clientY);
-    if (!hit || !hit.uv) return;
+    if (!hit || !hit.uv) return false;
 
     let uvx = hit.uv.x;
     let uvy = hit.uv.y;
@@ -1071,6 +1197,7 @@ function paint(clientX, clientY) {
     const radiusPx = (paintSize / SIZE) * TEX_RES;
 
     stampBrush(px, py, radiusPx);
+    return true;
 }
 
 // ============ EXPORT ============
@@ -1301,14 +1428,16 @@ function doZoom(dy) {
 let dragging = false;
 let dragMode = null;
 let lastX = 0, lastY = 0;
+let dragModified = false;   // apakah ada perubahan vertex/canvas selama drag ini
 
 function startDrag(mode, x, y) {
     dragging = true;
     dragMode = mode;
     lastX = x;
     lastY = y;
-    if (mode === 'sculpt') sculpt(x, y);
-    if (mode === 'paint') paint(x, y);
+    dragModified = false;
+    if (mode === 'sculpt') { if (sculpt(x, y)) dragModified = true; }
+    if (mode === 'paint')  { if (paint(x, y))  dragModified = true; }
 }
 
 function moveDrag(x, y) {
@@ -1318,16 +1447,21 @@ function moveDrag(x, y) {
     lastX = x;
     lastY = y;
 
-    if (dragMode === 'sculpt') sculpt(x, y);
-    else if (dragMode === 'paint') paint(x, y);
+    if (dragMode === 'sculpt') { if (sculpt(x, y)) dragModified = true; }
+    else if (dragMode === 'paint') { if (paint(x, y)) dragModified = true; }
     else if (dragMode === 'orbit') doOrbit(dx, dy);
     else if (dragMode === 'pan') doPan(dx, dy);
     else if (dragMode === 'zoom') doZoom(dy);
 }
 
 function endDrag() {
+    // Commit history HANYA kalau sculpt/paint benar-benar mengubah sesuatu
+    if (dragging && dragModified && (dragMode === 'sculpt' || dragMode === 'paint')) {
+        commitHistory();
+    }
     dragging = false;
     dragMode = null;
+    dragModified = false;
 }
 
 // ============ MOUSE GLOBAL ============
@@ -1455,6 +1589,9 @@ fixNormalsUpward();
 updateNormalsCache();
 recomputeAdaptiveUV();
 updateHint();
+
+// Snapshot state awal — supaya undo pertama balik ke kondisi bersih
+commitHistory();
 
 // ============ RENDER LOOP ============
 function animate() {
