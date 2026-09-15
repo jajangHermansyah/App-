@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Sculpting 3D - Multi-Touch Fixed</title>
+<title>Sculpting 3D - Hardness & Circle Smooth</title>
 <style>
     * { box-sizing: border-box; }
     body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; background: #0a0a14; }
@@ -20,11 +20,22 @@
     .icon-btn:hover { background: rgba(255,255,255,0.15); }
     .icon-btn.disabled { opacity: 0.3; pointer-events: none; }
 
+    #gizmoBtn {
+        position: absolute; top: 60px; right: 10px; z-index: 100;
+        width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.15); border-radius: 50%;
+        color: #fff; font-size: 19px; cursor: pointer; user-select: none; transition: 0.2s;
+    }
+    #gizmoBtn:hover { background: rgba(255,255,255,0.15); }
+    #gizmoBtn:active { transform: scale(0.9); }
+    #gizmoBtn.active { background: #22cc88; border-color: #22cc88; box-shadow: 0 0 14px #22cc8899; }
+
     #toolBar {
         position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
         display: flex; gap: 5px; z-index: 100; background: rgba(0,0,0,0.6);
         padding: 5px; border-radius: 22px; backdrop-filter: blur(12px);
-        border: 1px solid rgba(255,255,255,0.15); max-width: calc(100vw - 120px);
+        border: 1px solid rgba(255,255,255,0.15); max-width: calc(100vw - 160px);
     }
     .tool-btn {
         padding: 7px 11px; border: none; border-radius: 17px;
@@ -36,6 +47,7 @@
     .tool-btn:active { transform: scale(0.95); }
     .tool-btn.paint.active { background: #22cc88; box-shadow: 0 0 12px #22cc8888; }
     .tool-btn.smooth.active { background: #cc66ff; box-shadow: 0 0 12px #cc66ff88; }
+    .tool-btn.pick.active { background: #ffbb33; box-shadow: 0 0 12px #ffbb3388; color: #000; }
     .tool-btn .label { display: inline; }
     .tool-btn .icon-only { display: none; }
 
@@ -106,6 +118,23 @@
     .slider-row .slider-label { display: flex; justify-content: space-between; color: #fff; font-size: 13px; }
     .slider-row .slider-label span:last-child { color: #88aaff; font-variant-numeric: tabular-nums; }
     .slider-row input[type=range] { width: 100%; accent-color: #4a8cff; }
+
+    /* Brush preview strip */
+    #brushPreviewRow {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 0 4px;
+    }
+    #brushPreviewCanvas {
+        width: 60px; height: 60px;
+        background: #111;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.1);
+        flex-shrink: 0;
+    }
+    #brushPreviewInfo {
+        font-size: 11px; color: #8899bb; line-height: 1.4;
+    }
+    #brushPreviewInfo b { color: #fff; }
 
     .style-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 4px 0 6px; }
     .style-btn {
@@ -220,6 +249,21 @@
     }
     #imageToggleBtn.show { display: flex; }
 
+    #colorPreviewChip {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 12px; background: rgba(255,255,255,0.05);
+        border-radius: 10px; margin-bottom: 8px;
+        font-size: 12px; color: #fff;
+    }
+    #colorPreviewChip .sw {
+        width: 24px; height: 24px; border-radius: 6px;
+        border: 2px solid rgba(255,255,255,0.3);
+        background: #ffffff;
+    }
+    #colorPreviewChip .hex {
+        color: #88aaff; font-family: monospace; margin-left: auto;
+    }
+
     #loading {
         position: fixed; inset: 0; background: rgba(0,0,0,0.85);
         display: none; align-items: center; justify-content: center;
@@ -243,6 +287,7 @@
     #toast.show { opacity: 1; }
     #toast.error { background: #cc3344; }
     #toast.warn { background: #ff8844; }
+    #toast.pick { background: #ffbb33; color: #000; }
 
     #drawerOverlay {
         position: absolute; inset: 0; z-index: 150; background: rgba(0,0,0,0.5);
@@ -277,6 +322,7 @@
         #settingsDrawer { width: 88vw; }
         .icon-btn { width: 36px; height: 36px; font-size: 16px; }
         #gearBtn { width: 40px; height: 40px; font-size: 20px; }
+        #gizmoBtn { top: 56px; right: 10px; width: 40px; height: 40px; font-size: 18px; }
         .img-sliders-grid { grid-template-columns: 1fr 1fr; }
         #imageToggleBtn { bottom: 50px; padding: 9px 14px; font-size: 11px; }
     }
@@ -302,9 +348,13 @@
     <button class="tool-btn paint" data-tool="paint" title="Warnai">
         <span class="icon-only">🎨</span><span class="label">🎨 Warnai</span>
     </button>
+    <button class="tool-btn pick" data-tool="pick" title="Ambil Warna dari Objek">
+        <span class="icon-only">🧪</span><span class="label">🧪 Ambil</span>
+    </button>
 </div>
 
 <div id="gearBtn" title="Pengaturan">⚙️</div>
+<div id="gizmoBtn" title="Gizmo Scale">📏</div>
 <button id="imageToggleBtn">🖼️ Atur Gambar</button>
 <div id="drawerOverlay"></div>
 
@@ -322,12 +372,44 @@
                 <input type="range" id="brushSize" min="0.05" max="0.6" step="0.01" value="0.25">
             </div>
             <div class="slider-row">
-                <div class="slider-label"><span>Kekuatan</span><span id="lblBrushStrength">0.02</span></div>
+                <div class="slider-label"><span>Kekuatan (Sculpt)</span><span id="lblBrushStrength">0.02</span></div>
                 <input type="range" id="brushStrength" min="0.003" max="0.06" step="0.002" value="0.02">
             </div>
+            <div class="slider-row">
+                <div class="slider-label"><span>Kekerasan</span><span id="lblBrushHardness">50%</span></div>
+                <input type="range" id="brushHardness" min="0" max="1" step="0.01" value="0.5">
+            </div>
+            <div class="slider-row">
+                <div class="slider-label"><span>Halus Lingkaran</span><span id="lblBrushCircleSmooth">50%</span></div>
+                <input type="range" id="brushCircleSmooth" min="0" max="1" step="0.01" value="0.5">
+            </div>
+
+            <div id="brushPreviewRow">
+                <canvas id="brushPreviewCanvas" width="120" height="120"></canvas>
+                <div id="brushPreviewInfo">
+                    <b>Preview Kuas</b><br>
+                    Kekerasan: <span id="prevHardness">50%</span><br>
+                    Halus: <span id="prevSmooth">50%</span><br>
+                    <span style="color:#667; font-size:10px;">Bentuk tepi kuas</span>
+                </div>
+            </div>
+
             <div class="setting-row">
                 <label for="antiTearToggle">🛡️ Anti-Robek (Smooth Otomatis)</label>
                 <div class="toggle green on" id="antiTearToggle"></div>
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div class="setting-section-title">📏 Gizmo Scale</div>
+            <div class="setting-row">
+                <label for="gizmoToggleDrawer">Aktifkan Gizmo (di tengah objek)</label>
+                <div class="toggle green" id="gizmoToggleDrawer"></div>
+            </div>
+            <div class="info-box">
+                Tap tombol 📏 di kanan atas. Gizmo muncul di pusat objek.
+                Tarik handle (merah/hijau/biru = per-sumbu, putih/kotak = seragam).
+                Skala akan <b>dibakar permanen</b> ke geometri saat jari dilepas.
             </div>
         </div>
 
@@ -339,7 +421,7 @@
             </div>
             <div class="info-box">
                 Ukuran OBJ saat ini: <b id="remeshInfo">~2.16 MB · 32,768 tris</b><br>
-                ⚠️ Menerapkan remesh akan menghapus sculpt &amp; warna yang ada.
+                ⚠️ Remesh akan menghapus sculpt &amp; warna.
             </div>
             <button class="action-btn warning" id="applyRemeshBtn">🔻 Terapkan Remesh</button>
         </div>
@@ -389,6 +471,11 @@
 
         <div class="setting-section">
             <div class="setting-section-title">🎨 Warna</div>
+            <div id="colorPreviewChip">
+                <div class="sw" id="currentColorSw"></div>
+                <span>Warna aktif</span>
+                <span class="hex" id="currentColorHex">#ffffff</span>
+            </div>
             <div class="palette-grid" id="paletteGrid">
                 <div class="swatch active" data-color="#ffffff" style="background:#ffffff" title="Putih"></div>
                 <div class="swatch" data-color="#e8b98a" style="background:#e8b98a" title="Kulit"></div>
@@ -403,7 +490,12 @@
                 <div class="slider-label"><span>Warna kustom</span></div>
                 <input type="color" id="colorPicker" value="#ffffff" style="width:100%; height:38px; border:none; border-radius:8px; cursor:pointer; background:transparent;">
             </div>
-            <button class="action-btn" id="skinFillBtn">🧴 Isi Bola dengan Warna Kulit</button>
+            <button class="action-btn" id="skinFillBtn">🧴 Isi Latar dengan Warna Kulit</button>
+            <button class="action-btn danger" id="clearPaintBtn">🧹 Hapus Lukisan Kuas (Biarkan Gambar)</button>
+            <div class="info-box" style="margin-top:10px;">
+                <b>🧪 Alat Ambil Warna:</b> Tap tombol 🧪 di toolbar, lalu tap objek
+                untuk menyalin warna di titik itu. Warna langsung jadi warna kuas aktif.
+            </div>
         </div>
 
         <div class="setting-section">
@@ -434,9 +526,10 @@
             <div style="font-size: 11px; color: #667; line-height: 1.6;">
                 <p style="margin: 4px 0;">
                     <b style="color:#8899bb;">Gesture:</b><br>
-                    • 1 jari di bola → sculpt<br>
+                    • 1 jari di bola → sculpt / paint / pick<br>
                     • 1 jari di area kosong → rotate<br>
-                    • 2 jari (di mana saja, termasuk di objek) → zoom &amp; pan
+                    • 2 jari → zoom &amp; pan<br>
+                    • Gizmo aktif → tarik handle untuk scale
                 </p>
             </div>
         </div>
@@ -456,7 +549,7 @@
     <div class="img-panel-body">
         <div class="lock-mirror-row" id="lockMirrorRow">
             <input type="checkbox" id="lockMirrorX" checked>
-            <label for="lockMirrorX">🔒 Kunci di mirror (X=0) — wajib untuk simetri</label>
+            <label for="lockMirrorX">🔒 Kunci di mirror (X=0)</label>
         </div>
         <div class="img-sliders-grid">
             <div class="img-slider"><div class="lbl"><span>Geser X</span><span id="lblOffsetX">0.00</span></div><input type="range" id="imgOffsetX" min="-1" max="1" step="0.01" value="0"></div>
@@ -507,8 +600,8 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
-// Nilai numerik TOUCH (sesuai OrbitControls)
 const TOUCH_ROTATE = 0;
 const TOUCH_PAN = 1;
 const TOUCH_DOLLY_PAN = 2;
@@ -587,37 +680,66 @@ function applyHeadlightIntensity() {
 }
 applyHeadlightIntensity();
 
-// ==================== TEKSTUR ====================
+// ============================================================
+// 3 CANVAS LAYER: image | paint | composite (texture)
+// ============================================================
 const TEX_SIZE = 1024;
-const textureCanvas = document.createElement('canvas');
-textureCanvas.width = TEX_SIZE;
-textureCanvas.height = TEX_SIZE;
-const textureCtx = textureCanvas.getContext('2d');
+const UNDO_RES = 512;
+const MAX_HISTORY = 15;
 
-function clearTextureToWhite() {
-    textureCtx.globalAlpha = 1;
-    textureCtx.fillStyle = '#ffffff';
-    textureCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-}
-clearTextureToWhite();
+const imageCanvas = document.createElement('canvas');
+imageCanvas.width = imageCanvas.height = TEX_SIZE;
+const imageCtx = imageCanvas.getContext('2d');
+imageCtx.fillStyle = '#ffffff';
+imageCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+
+const paintCanvas = document.createElement('canvas');
+paintCanvas.width = paintCanvas.height = TEX_SIZE;
+const paintCtx = paintCanvas.getContext('2d');
+
+const textureCanvas = document.createElement('canvas');
+textureCanvas.width = textureCanvas.height = TEX_SIZE;
+const textureCtx = textureCanvas.getContext('2d', { willReadFrequently: true });
 
 const canvasTexture = new THREE.CanvasTexture(textureCanvas);
 canvasTexture.colorSpace = THREE.SRGBColorSpace;
+canvasTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+function recomposeTexture() {
+    textureCtx.globalCompositeOperation = 'source-over';
+    textureCtx.globalAlpha = 1;
+    textureCtx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
+    textureCtx.drawImage(imageCanvas, 0, 0);
+    textureCtx.drawImage(paintCanvas, 0, 0);
+    canvasTexture.needsUpdate = true;
+}
+recomposeTexture();
+
+let compositeQueued = false;
+function scheduleRecompose() {
+    if (compositeQueued) return;
+    compositeQueued = true;
+    requestAnimationFrame(() => {
+        compositeQueued = false;
+        recomposeTexture();
+    });
+}
+
+function clearPaint() {
+    paintCtx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
+}
 
 const material = new THREE.MeshStandardMaterial({
-    color: 0xffffff, vertexColors: true, map: canvasTexture,
-    roughness: 0.55, metalness: 0.1
+    color: 0xffffff,
+    map: canvasTexture,
+    roughness: 0.55,
+    metalness: 0.1
 });
 
 // ==================== MESH STATE ====================
-const WHITE = new THREE.Color('#ffffff');
-const SKIN_COLOR = new THREE.Color('#e8b98a');
-
 let geometry = null;
 let sphere = null;
 let originalPositions = null;
-let vertexCount = 0;
-let colorsArray = null;
 
 let neighbors = null;
 let groupOf = null;
@@ -632,15 +754,6 @@ function buildMesh(segments) {
     if (geometry) geometry.dispose();
     geometry = new THREE.SphereGeometry(1, segments, segments);
     originalPositions = geometry.attributes.position.array.slice();
-    vertexCount = geometry.attributes.position.count;
-
-    colorsArray = new Float32Array(vertexCount * 3);
-    for (let i = 0; i < vertexCount; i++) {
-        colorsArray[i*3]     = WHITE.r;
-        colorsArray[i*3 + 1] = WHITE.g;
-        colorsArray[i*3 + 2] = WHITE.b;
-    }
-    geometry.setAttribute('color', new THREE.BufferAttribute(colorsArray, 3));
 
     neighbors = buildAdjacency(geometry);
     const weld = buildWeldData(geometry, neighbors);
@@ -797,31 +910,138 @@ grid.position.y = -1.5;
 scene.add(grid);
 
 // ============================================================
+// GIZMO SCALE
+// ============================================================
+let gizmoEnabled = false;
+let gizmoDragging = false;
+let gizmoDidChange = false;
+
+const tc = new TransformControls(camera, renderer.domElement);
+tc.setMode('scale');
+tc.setSpace('local');
+tc.setSize(0.85);
+tc.visible = false;
+tc.enabled = false;
+tc.attach(sphere);
+scene.add(tc);
+
+tc.addEventListener('dragging-changed', (e) => {
+    gizmoDragging = e.value;
+    if (e.value) {
+        controls.enabled = false;
+        if (isSculpting) cancelSculptInternal();
+    } else {
+        controls.enabled = true;
+    }
+});
+
+tc.addEventListener('mouseDown', () => { gizmoDidChange = false; });
+
+tc.addEventListener('objectChange', () => {
+    if (!gizmoDidChange) {
+        pushUndo();
+        gizmoDidChange = true;
+    }
+});
+
+tc.addEventListener('mouseUp', () => {
+    if (gizmoDidChange) bakeScaleToGeometry();
+    gizmoDidChange = false;
+});
+
+function bakeScaleToGeometry() {
+    const sx = sphere.scale.x, sy = sphere.scale.y, sz = sphere.scale.z;
+    const eps = 1e-5;
+    if (Math.abs(sx - 1) < eps && Math.abs(sy - 1) < eps && Math.abs(sz - 1) < eps) {
+        sphere.scale.set(1, 1, 1);
+        return;
+    }
+    const arr = geometry.attributes.position.array;
+    for (let i = 0; i < arr.length; i += 3) {
+        arr[i]     *= sx;
+        arr[i + 1] *= sy;
+        arr[i + 2] *= sz;
+    }
+    geometry.attributes.position.needsUpdate = true;
+    edgeLengthOriginal = computeAverageEdgeLength(geometry);
+    sphere.scale.set(1, 1, 1);
+    refreshNormals();
+    showToast('📏 Bentuk diperbarui');
+}
+
+function isOnGizmo(clientX, clientY) {
+    if (!gizmoEnabled) return false;
+    const rect = canvas.getBoundingClientRect();
+    const center = new THREE.Vector3(0, 0, 0).project(camera);
+    const sx = (center.x * 0.5 + 0.5) * rect.width + rect.left;
+    const sy = (-center.y * 0.5 + 0.5) * rect.height + rect.top;
+    return Math.hypot(clientX - sx, clientY - sy) < 130;
+}
+
+function setGizmoEnabled(on) {
+    gizmoEnabled = on;
+    tc.visible = on;
+    tc.enabled = on;
+    document.getElementById('gizmoBtn').classList.toggle('active', on);
+    document.getElementById('gizmoToggleDrawer').classList.toggle('on', on);
+    showToast(on ? '📏 Gizmo Scale ON' : '📏 Gizmo OFF');
+}
+
+document.getElementById('gizmoBtn').addEventListener('click', () => setGizmoEnabled(!gizmoEnabled));
+document.getElementById('gizmoToggleDrawer').addEventListener('click', () => setGizmoEnabled(!gizmoEnabled));
+
+// ============================================================
 // UNDO / REDO
 // ============================================================
 const undoStack = [];
 const redoStack = [];
-const MAX_HISTORY = 25;
+
+const _snapCanvas = document.createElement('canvas');
+_snapCanvas.width = _snapCanvas.height = UNDO_RES;
+const _snapCtx = _snapCanvas.getContext('2d', { willReadFrequently: true });
+
+const _restoreCanvas = document.createElement('canvas');
+_restoreCanvas.width = _restoreCanvas.height = UNDO_RES;
+const _restoreCtx = _restoreCanvas.getContext('2d');
+
+function grabImageData(srcCanvas) {
+    _snapCtx.clearRect(0, 0, UNDO_RES, UNDO_RES);
+    _snapCtx.drawImage(srcCanvas, 0, 0, UNDO_RES, UNDO_RES);
+    return _snapCtx.getImageData(0, 0, UNDO_RES, UNDO_RES);
+}
+
+function putImageData(ctx, dstCanvas, imgData) {
+    _restoreCtx.putImageData(imgData, 0, 0);
+    ctx.clearRect(0, 0, dstCanvas.width, dstCanvas.height);
+    ctx.drawImage(_restoreCanvas, 0, 0, dstCanvas.width, dstCanvas.height);
+}
 
 function takeSnapshot() {
     return {
         positions: geometry.attributes.position.array.slice(),
-        colors: geometry.attributes.color.array.slice()
+        imageData: grabImageData(imageCanvas),
+        paintData: grabImageData(paintCanvas)
     };
 }
+
 function pushUndo() {
     undoStack.push(takeSnapshot());
     if (undoStack.length > MAX_HISTORY) undoStack.shift();
     redoStack.length = 0;
     updateUndoRedoUI();
 }
+
 function applySnapshot(s) {
     geometry.attributes.position.array.set(s.positions);
-    geometry.attributes.color.array.set(s.colors);
     geometry.attributes.position.needsUpdate = true;
-    geometry.attributes.color.needsUpdate = true;
+
+    putImageData(imageCtx, imageCanvas, s.imageData);
+    putImageData(paintCtx, paintCanvas, s.paintData);
+    recomposeTexture();
+
     refreshNormals();
 }
+
 function undo() {
     if (undoStack.length === 0) return;
     redoStack.push(takeSnapshot());
@@ -829,6 +1049,7 @@ function undo() {
     updateUndoRedoUI();
     showToast('↶ Undo');
 }
+
 function redo() {
     if (redoStack.length === 0) return;
     undoStack.push(takeSnapshot());
@@ -836,10 +1057,12 @@ function redo() {
     updateUndoRedoUI();
     showToast('↷ Redo');
 }
+
 function updateUndoRedoUI() {
     document.getElementById('undoBtn').classList.toggle('disabled', undoStack.length === 0);
     document.getElementById('redoBtn').classList.toggle('disabled', redoStack.length === 0);
 }
+
 document.getElementById('undoBtn').addEventListener('click', undo);
 document.getElementById('redoBtn').addEventListener('click', redo);
 updateUndoRedoUI();
@@ -849,19 +1072,180 @@ document.addEventListener('keydown', (e) => {
     else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
 });
 
-// ==================== UI TOOLS ====================
+// ==================== STATE ====================
+let tool = 'pull';
+let brushSize = 0.25;
+let brushStrength = 0.02;
+let brushHardness = 0.5;      // 0 = lembut, 1 = keras
+let brushCircleSmooth = 0.5;  // 0 = kasar, 1 = sangat halus
+let isSculpting = false;
+let sculptPointerId = null;
+let mirrorEnabled = true;
+let antiTearEnabled = true;
+let lastHitPoint = null;
+let paintColor = new THREE.Color('#ffffff');
+let sculptStartSnapshot = null;
+let savedRedoStack = null;
+let pickingActive = false;
+
+let uploadedImage = null;
+let imgOffsetX = 0, imgOffsetY = 0;
+let imgScale = 1;
+let imgWidth = 1, imgHeight = 1;
+let imgRotation = 0, imgOpacity = 1;
+let imgFlipH = false, imgFlipV = false;
+let lockMirrorX = true;
+const FACE_U_CENTER = 0.25;
+
+// ============================================================
+// BRUSH SHAPE ENGINE
+// Menghitung ulang kurva falloff berdasarkan:
+//   - brushHardness    : eksponen (0=lembut, 1=keras)
+//   - brushCircleSmooth: blend linear → smoothstep (0=keras/kasar, 1=halus)
+// Masukan: nilai dasar 0..1 (0 = tepi, 1 = pusat)
+// ============================================================
+function shapeFalloff(base) {
+    // Clamp untuk keamanan
+    if (base <= 0) return 0;
+    if (base >= 1) return 1;
+
+    // 1) Kekerasan: eksponen bertingkat
+    //    hardness=0   → exp = 1/3  → jatuh pelan dari pusat (sangat lembut)
+    //    hardness=0.5 → exp = 1    → linear (netral)
+    //    hardness=1   → exp = 3    → jatuh cepat (keras, terpusat)
+    const exp = Math.pow(3, (brushHardness - 0.5) * 2);
+    let f = Math.pow(base, exp);
+
+    // 2) Halus lingkaran: blend linear ↔ smoothstep
+    //    circleSmooth=0   → linear (tepi lebih tegas)
+    //    circleSmooth=1   → smoothstep (tepi sangat halus / anti-alias)
+    if (brushCircleSmooth > 0) {
+        const ss = f * f * (3 - 2 * f); // smoothstep
+        f = f * (1 - brushCircleSmooth) + ss * brushCircleSmooth;
+    }
+
+    return f;
+}
+
+// Preview canvas — menggambar bentuk tepi kuas 2D
+const prevCanvas = document.getElementById('brushPreviewCanvas');
+const prevCtx = prevCanvas.getContext('2d');
+
+function drawBrushPreview() {
+    const W = prevCanvas.width, H = prevCanvas.height;
+    const cx = W / 2, cy = H / 2;
+    const R = Math.min(W, H) / 2 - 6;
+
+    prevCtx.clearRect(0, 0, W, H);
+
+    // Background
+    prevCtx.fillStyle = '#0a0a14';
+    prevCtx.fillRect(0, 0, W, H);
+
+    // Concentric rings (grid)
+    prevCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+    prevCtx.lineWidth = 1;
+    for (let i = 1; i <= 3; i++) {
+        prevCtx.beginPath();
+        prevCtx.arc(cx, cy, R * (i / 3), 0, Math.PI * 2);
+        prevCtx.stroke();
+    }
+
+    // Radial gradient sesuai brush shape
+    const grad = prevCtx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    const N = 24;
+    for (let i = 0; i <= N; i++) {
+        const u = i / N;      // 0 = pusat, 1 = tepi
+        const t = 1 - u;      // 1 = pusat, 0 = tepi
+        const alpha = shapeFalloff(t);
+        grad.addColorStop(u, `rgba(102,204,255,${alpha * 0.85})`);
+    }
+    prevCtx.fillStyle = grad;
+    prevCtx.beginPath();
+    prevCtx.arc(cx, cy, R, 0, Math.PI * 2);
+    prevCtx.fill();
+
+    // Outer circle outline
+    prevCtx.strokeStyle = 'rgba(102,204,255,0.6)';
+    prevCtx.lineWidth = 1.5;
+    prevCtx.beginPath();
+    prevCtx.arc(cx, cy, R, 0, Math.PI * 2);
+    prevCtx.stroke();
+}
+
+// ==================== SET TOOL ====================
+function setTool(name) {
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => {
+        b.classList.toggle('active', b.dataset.tool === name);
+    });
+    tool = name;
+
+    let c = 0x66ccff;
+    if (tool === 'smooth') c = 0xcc66ff;
+    else if (tool === 'paint' || tool === 'pick') c = paintColor.getHex();
+    brushIndicator.material.color.setHex(c);
+
+    if (tool === 'pick') {
+        showToast('🧪 Tap objek untuk ambil warna', 'pick');
+    }
+}
+
 document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        tool = btn.dataset.tool;
-        let c = 0x66ccff;
-        if (tool === 'smooth') c = 0xcc66ff;
-        else if (tool === 'paint') c = paintColor.getHex();
-        brushIndicator.material.color.setHex(c);
+    btn.addEventListener('click', () => setTool(btn.dataset.tool));
+});
+
+// ==================== WARNA ====================
+function updateColorUI() {
+    const hex = '#' + paintColor.getHexString();
+    document.getElementById('colorPicker').value = hex;
+    document.getElementById('currentColorSw').style.background = hex;
+    document.getElementById('currentColorHex').textContent = hex;
+}
+
+document.getElementById('colorPicker').addEventListener('input', e => {
+    setPaintColor(e.target.value);
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+});
+document.querySelectorAll('.swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+        document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+        sw.classList.add('active');
+        setPaintColor(sw.dataset.color);
     });
 });
 
+function setPaintColor(hex) {
+    paintColor.set(hex);
+    if (tool === 'paint' || tool === 'pick') brushIndicator.material.color.copy(paintColor);
+    updateColorUI();
+}
+
+// ============================================================
+// EYEDROPPER
+// ============================================================
+function sampleColorAtUV(u, v) {
+    u = ((u % 1) + 1) % 1;
+    v = Math.max(0, Math.min(1, v));
+    let px = Math.floor(u * TEX_SIZE);
+    let py = Math.floor((1 - v) * TEX_SIZE);
+    if (px < 0) px = 0; else if (px >= TEX_SIZE) px = TEX_SIZE - 1;
+    if (py < 0) py = 0; else if (py >= TEX_SIZE) py = TEX_SIZE - 1;
+    const data = textureCtx.getImageData(px, py, 1, 1).data;
+    return new THREE.Color(data[0] / 255, data[1] / 255, data[2] / 255);
+}
+
+function applyPickedColor(color) {
+    paintColor.copy(color);
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    updateColorUI();
+
+    setTool('paint');
+
+    const hex = '#' + color.getHexString();
+    showToast('🧪 Warna diambil: ' + hex, 'pick');
+}
+
+// ==================== STYLE & LAIN-LAIN ====================
 const PULL_STYLES = {
     normal: { name: 'Bulat',    icon: '⚪', falloff: t => t*t*(3-2*t), heightMul: 1.0, maxEdgeMul: 3.5 },
     horn:   { name: 'Tanduk',   icon: '🦏', falloff: t => Math.pow(t, 3), heightMul: 1.9, maxEdgeMul: 5.5 },
@@ -875,25 +1259,6 @@ const PULL_STYLES = {
 
 let pullStyle = 'normal';
 let styleIntensity = 1.0;
-
-let tool = 'pull';
-let brushSize = 0.25;
-let brushStrength = 0.02;
-let isSculpting = false;
-let sculptPointerId = null;
-let mirrorEnabled = true;
-let antiTearEnabled = true;
-let lastHitPoint = null;
-let paintColor = new THREE.Color('#ffffff');
-
-let uploadedImage = null;
-let imgOffsetX = 0, imgOffsetY = 0;
-let imgScale = 1;
-let imgWidth = 1, imgHeight = 1;
-let imgRotation = 0, imgOpacity = 1;
-let imgFlipH = false, imgFlipV = false;
-let lockMirrorX = true;
-const FACE_U_CENTER = 0.25;
 
 document.querySelectorAll('.style-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -936,16 +1301,11 @@ function updateRemeshInfo(seg) {
     if (lblEl) lblEl.textContent = seg;
 }
 
-remeshSlider.addEventListener('input', (e) => {
-    updateRemeshInfo(parseInt(e.target.value));
-});
+remeshSlider.addEventListener('input', (e) => updateRemeshInfo(parseInt(e.target.value)));
 
 document.getElementById('applyRemeshBtn').addEventListener('click', async () => {
     const seg = parseInt(remeshSlider.value);
-    if (seg === currentSegments) {
-        showToast('⚠️ Resolusi tidak berubah', 'warn');
-        return;
-    }
+    if (seg === currentSegments) { showToast('⚠️ Resolusi tidak berubah', 'warn'); return; }
     const ok = await showConfirm('🔻 Terapkan Remesh?',
         `Bola akan dibangun ulang dengan resolusi ${seg}×${seg}. Semua sculpt dan warna akan dihapus.`);
     if (!ok) return;
@@ -1031,28 +1391,27 @@ document.getElementById('brushStrength').addEventListener('input', e => {
     document.getElementById('lblBrushStrength').textContent = brushStrength.toFixed(3);
 });
 
+// ===== DUA SLIDER BARU =====
+document.getElementById('brushHardness').addEventListener('input', e => {
+    brushHardness = parseFloat(e.target.value);
+    const pct = Math.round(brushHardness * 100) + '%';
+    document.getElementById('lblBrushHardness').textContent = pct;
+    document.getElementById('prevHardness').textContent = pct;
+    drawBrushPreview();
+});
+document.getElementById('brushCircleSmooth').addEventListener('input', e => {
+    brushCircleSmooth = parseFloat(e.target.value);
+    const pct = Math.round(brushCircleSmooth * 100) + '%';
+    document.getElementById('lblBrushCircleSmooth').textContent = pct;
+    document.getElementById('prevSmooth').textContent = pct;
+    drawBrushPreview();
+});
+
 document.getElementById('antiTearToggle').addEventListener('click', (e) => {
     antiTearEnabled = !antiTearEnabled;
     e.target.classList.toggle('on', antiTearEnabled);
     showToast(antiTearEnabled ? '🛡️ Anti-Robek ON' : '⚠️ Anti-Robek OFF', antiTearEnabled ? '' : 'warn');
 });
-
-document.getElementById('colorPicker').addEventListener('input', e => {
-    setPaintColor(e.target.value);
-    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-});
-document.querySelectorAll('.swatch').forEach(sw => {
-    sw.addEventListener('click', () => {
-        document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-        sw.classList.add('active');
-        setPaintColor(sw.dataset.color);
-        document.getElementById('colorPicker').value = sw.dataset.color;
-    });
-});
-function setPaintColor(hex) {
-    paintColor.set(hex);
-    if (tool === 'paint') brushIndicator.material.color.copy(paintColor);
-}
 
 document.getElementById('mirrorToggle').addEventListener('click', (e) => {
     mirrorEnabled = !mirrorEnabled;
@@ -1065,28 +1424,37 @@ document.getElementById('mirrorToggle').addEventListener('click', (e) => {
 
 document.getElementById('skinFillBtn').addEventListener('click', () => {
     pushUndo();
-    const colAttr = geometry.attributes.color;
-    for (let i = 0; i < colAttr.count; i++) {
-        colAttr.setXYZ(i, SKIN_COLOR.r, SKIN_COLOR.g, SKIN_COLOR.b);
-    }
-    colAttr.needsUpdate = true;
-    showToast('🧴 Diwarnai kulit');
+    imageCtx.fillStyle = '#e8b98a';
+    imageCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    clearPaint();
+    recomposeTexture();
+    showToast('🧴 Latar diwarnai kulit');
+});
+
+document.getElementById('clearPaintBtn').addEventListener('click', async () => {
+    const ok = await showConfirm('Hapus Lukisan Kuas?', 'Lukisan kuas akan dihapus, gambar galeri tetap.');
+    if (!ok) return;
+    pushUndo();
+    clearPaint();
+    recomposeTexture();
+    showToast('🧹 Lukisan dihapus');
 });
 
 document.getElementById('resetBtn').addEventListener('click', async () => {
     const ok = await showConfirm('Reset ke Bola Semula?', 'Semua sculpt, warna, dan gambar akan dihapus.');
     if (!ok) return;
+    pushUndo();
     const posAttr = geometry.attributes.position;
     posAttr.array.set(originalPositions);
     posAttr.needsUpdate = true;
-    const colAttr = geometry.attributes.color;
-    for (let i = 0; i < colAttr.count; i++) colAttr.setXYZ(i, WHITE.r, WHITE.g, WHITE.b);
-    colAttr.needsUpdate = true;
+    imageCtx.fillStyle = '#ffffff';
+    imageCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    clearPaint();
+    recomposeTexture();
     refreshNormals();
-    removeImage();
-    undoStack.length = 0;
-    redoStack.length = 0;
-    updateUndoRedoUI();
+    uploadedImage = null;
+    closeImagePanel();
+    imageToggleBtn.classList.remove('show');
     showToast('🔄 Reset selesai');
 });
 
@@ -1106,12 +1474,17 @@ function hitSphere(clientX, clientY) {
     return hits.length > 0 ? hits[0] : null;
 }
 
-function applyTool(hitPoint) {
-    const localHit = sphere.worldToLocal(hitPoint.clone());
+function applyTool(hit) {
     if (tool === 'paint') {
-        paintAround(localHit, paintColor);
-        if (mirrorEnabled) paintAround(new THREE.Vector3(-localHit.x, localHit.y, localHit.z), paintColor);
+        if (!hit.uv) return;
+        paintAtUV(hit.uv.x, hit.uv.y, paintColor, brushSize);
+        if (mirrorEnabled) {
+            const mu = ((0.5 - hit.uv.x) % 1 + 1) % 1;
+            paintAtUV(mu, hit.uv.y, paintColor, brushSize);
+        }
+        scheduleRecompose();
     } else {
+        const localHit = sphere.worldToLocal(hit.point.clone());
         deformAround(localHit);
         if (mirrorEnabled) deformAround(new THREE.Vector3(-localHit.x, localHit.y, localHit.z));
         if (antiTearEnabled && tool !== 'smooth') {
@@ -1123,6 +1496,58 @@ function applyTool(hitPoint) {
     }
 }
 
+// ============================================================
+// PAINT AT UV — gradien mengikuti shapeFalloff(hardness, smooth)
+// ============================================================
+function paintAtUV(u, v, color, radiusWorld) {
+    u = ((u % 1) + 1) % 1;
+    v = Math.max(0.001, Math.min(0.999, v));
+
+    const rU = (radiusWorld / (2 * Math.PI)) * TEX_SIZE;
+    const rV = (radiusWorld / Math.PI) * TEX_SIZE;
+
+    const cx = u * TEX_SIZE;
+    const cy = (1 - v) * TEX_SIZE;
+
+    const rgb = `${Math.round(color.r * 255)},${Math.round(color.g * 255)},${Math.round(color.b * 255)}`;
+
+    const drawDot = (px, py) => {
+        paintCtx.save();
+        paintCtx.translate(px, py);
+        paintCtx.scale(1, rV / rU);
+
+        const g = paintCtx.createRadialGradient(0, 0, 0, 0, 0, rU);
+
+        // Sampling shapeFalloff dalam banyak titik → smoothing alami
+        const N = 20;
+        for (let i = 0; i <= N; i++) {
+            const uNorm = i / N;         // 0=pusat, 1=tepi
+            const t = 1 - uNorm;         // 1=pusat, 0=tepi
+            let alpha = shapeFalloff(t);
+
+            // Sedikit boost di pusat agar kuas tetap opaque 100%
+            // saat hardness tinggi — supaya menimpa gambar total
+            if (uNorm === 0) alpha = 1;
+            else if (uNorm <= 0.05) alpha = Math.max(alpha, 0.98);
+
+            g.addColorStop(uNorm, `rgba(${rgb},${alpha})`);
+        }
+
+        paintCtx.fillStyle = g;
+        paintCtx.beginPath();
+        paintCtx.arc(0, 0, rU, 0, Math.PI * 2);
+        paintCtx.fill();
+        paintCtx.restore();
+    };
+
+    drawDot(cx, cy);
+    if (cx < rU) drawDot(cx + TEX_SIZE, cy);
+    if (cx > TEX_SIZE - rU) drawDot(cx - TEX_SIZE, cy);
+}
+
+// ============================================================
+// DEFORM — pakai shapeFalloff untuk hardness & circle smooth
+// ============================================================
 function deformAround(centerLocal) {
     if (tool === 'smooth') { smoothAround(centerLocal); return; }
     const arr = geometry.attributes.position.array;
@@ -1143,7 +1568,13 @@ function deformAround(centerLocal) {
 
         const dist = Math.sqrt(d2);
         const t = 1 - dist / brushSize;
-        const falloff = style.falloff(t);
+
+        // Gabungkan gaya preset dengan shapeFalloff (hardness+smooth)
+        const styleFalloff = style.falloff(t);
+        const shaped = shapeFalloff(t);
+        // Rata-rata geometrik: keduanya berkontribusi
+        const falloff = Math.sqrt(styleFalloff * shaped);
+
         let amt = sign * falloff * brushStrength * style.heightMul * styleIntensity;
         if (amt > maxMove) amt = maxMove;
         if (amt < -maxMove) amt = -maxMove;
@@ -1174,7 +1605,8 @@ function smoothAround(centerLocal) {
         if (!nb || nb.length === 0) continue;
         const dist = Math.sqrt(d2);
         const t = 1 - dist / brushSize;
-        const falloff = t * t * (3 - 2 * t);
+        const falloff = shapeFalloff(t);
+
         let avgX = 0, avgY = 0, avgZ = 0;
         for (let k = 0; k < nb.length; k++) {
             const j = nb[k] * 3;
@@ -1233,34 +1665,6 @@ function fixTornEdges(centerLocal) {
     }
 }
 
-function paintAround(centerLocal, color) {
-    const posArr = geometry.attributes.position.array;
-    const colAttr = geometry.attributes.color;
-    const colArr = colAttr.array;
-    const r2 = brushSize * brushSize;
-    for (let g = 0; g < groupList.length; g++) {
-        const rep = groupList[g];
-        const ix = rep * 3;
-        const dx = posArr[ix] - centerLocal.x;
-        const dy = posArr[ix + 1] - centerLocal.y;
-        const dz = posArr[ix + 2] - centerLocal.z;
-        const d2 = dx*dx + dy*dy + dz*dz;
-        if (d2 >= r2) continue;
-        const dist = Math.sqrt(d2);
-        const t = 1 - dist / brushSize;
-        const falloff = t * t * (3 - 2 * t);
-        const blend = falloff * 0.85;
-        const members = groupMembers.get(rep);
-        for (let k = 0; k < members.length; k++) {
-            const mx = members[k] * 3;
-            colArr[mx]     = colArr[mx]     * (1 - blend) + color.r * blend;
-            colArr[mx + 1] = colArr[mx + 1] * (1 - blend) + color.g * blend;
-            colArr[mx + 2] = colArr[mx + 2] * (1 - blend) + color.b * blend;
-        }
-    }
-    colAttr.needsUpdate = true;
-}
-
 function updateBrushIndicators(hit) {
     if (!hit) {
         if (!isSculpting) {
@@ -1274,7 +1678,7 @@ function updateBrushIndicators(hit) {
     brushIndicator.lookAt(hit.point.clone().add(hit.face.normal));
     brushIndicator.scale.setScalar(brushSize * 1.2);
 
-    if (mirrorEnabled) {
+    if (mirrorEnabled && tool !== 'pick') {
         const localHit = sphere.worldToLocal(hit.point.clone());
         const mirroredLocal = new THREE.Vector3(-localHit.x, localHit.y, localHit.z);
         const mirroredWorld = sphere.localToWorld(mirroredLocal.clone());
@@ -1289,12 +1693,10 @@ function updateBrushIndicators(hit) {
 }
 
 // ============================================================
-// ★★★ POINTER EVENTS — MULTI-TOUCH AWARE (FIX UTAMA) ★★★
+// POINTER EVENTS
 // ============================================================
 const activePointers = new Set();
 let multiTouchActive = false;
-let sculptStartSnapshot = null;
-let savedRedoStack = null;
 
 function startSculptInternal(pointerId, hit) {
     isSculpting = true;
@@ -1303,94 +1705,82 @@ function startSculptInternal(pointerId, hit) {
     sculptStartSnapshot = takeSnapshot();
     savedRedoStack = redoStack.slice();
     pushUndo();
-    applyTool(hit.point);
+    applyTool(hit);
     updateBrushIndicators(hit);
     try { canvas.setPointerCapture(pointerId); } catch(_) {}
 }
 
 function endSculptInternal() {
     if (!isSculpting) return;
-    const pid = sculptPointerId;
     isSculpting = false;
     sculptPointerId = null;
     lastHitPoint = null;
     sculptStartSnapshot = null;
     savedRedoStack = null;
-    try { canvas.releasePointerCapture(pid); } catch(_) {}
 }
 
 function cancelSculptInternal() {
     if (!isSculpting) return;
-    // Kembalikan geometri ke kondisi sebelum stroke dimulai
-    if (sculptStartSnapshot) {
-        applySnapshot(sculptStartSnapshot);
-    }
-    // Hapus entri undo yang tadi kita dorong
+    if (sculptStartSnapshot) applySnapshot(sculptStartSnapshot);
     if (undoStack.length > 0) undoStack.pop();
-    // Pulihkan redoStack yang tadinya dibersihkan oleh pushUndo
     if (savedRedoStack) {
         redoStack.length = 0;
         for (let i = 0; i < savedRedoStack.length; i++) redoStack.push(savedRedoStack[i]);
     }
     updateUndoRedoUI();
 
-    const pid = sculptPointerId;
     isSculpting = false;
     sculptPointerId = null;
     lastHitPoint = null;
     sculptStartSnapshot = null;
     savedRedoStack = null;
-    try { canvas.releasePointerCapture(pid); } catch(_) {}
     brushIndicator.visible = false;
     brushIndicatorMirror.visible = false;
 }
 
-// PENTING: listener di document dengan capture=true agar jalan SEBELUM
-// OrbitControls membaca controls.touches.ONE di target phase.
 document.addEventListener('pointerdown', (e) => {
-    if (e.target !== canvas) return; // abaikan UI element
+    if (e.target !== canvas) return;
 
     const isTouch = e.pointerType === 'touch';
     activePointers.add(e.pointerId);
 
+    if (gizmoEnabled && isOnGizmo(e.clientX, e.clientY)) return;
+
     if (activePointers.size === 1 && !multiTouchActive && e.isPrimary) {
         const hit = hitSphere(e.clientX, e.clientY);
         if (hit) {
-            // Mulai sculpt. Untuk touch, blokir rotate 1-jari OrbitControls
-            // dengan mengeset touches.ONE = null. JANGAN disable controls!
-            if (isTouch) {
-                controls.touches.ONE = null;
-            } else {
-                // Untuk mouse, aman untuk disable controls sejenak
-                controls.enabled = false;
+            // ============ EYEDROPPER ============
+            if (tool === 'pick') {
+                if (hit.uv) {
+                    pickingActive = true;
+                    controls.enabled = false;
+                    const c = sampleColorAtUV(hit.uv.x, hit.uv.y);
+                    applyPickedColor(c);
+                }
+                return;
             }
+            // ============ SCULPT / PAINT ============
+            if (isTouch) controls.touches.ONE = null;
+            else controls.enabled = false;
             startSculptInternal(e.pointerId, hit);
         }
     } else if (activePointers.size === 2) {
-        // Jari kedua turun → batalkan sculpt, aktifkan gesture kamera
         multiTouchActive = true;
-        if (isSculpting) {
-            cancelSculptInternal();
-        }
-        // Kembalikan 1-jari rotate untuk sentuhan berikutnya
+        if (isSculpting) cancelSculptInternal();
         controls.touches.ONE = TOUCH_ROTATE;
         controls.enabled = true;
     }
-    // TIDAK memanggil stopPropagation — biarkan OrbitControls memproses
 }, true);
 
 document.addEventListener('pointermove', (e) => {
-    if (e.target !== canvas && !e.isPrimary) {
-        // tetap proses jika pointer sedang sculpting (via capture)
-    }
-
     if (isSculpting && e.pointerId === sculptPointerId) {
         const hit = hitSphere(e.clientX, e.clientY);
         if (hit) {
             const dist = lastHitPoint ? hit.point.distanceTo(lastHitPoint) : 999;
-            const threshold = (tool === 'smooth') ? 0.0015 : 0.003;
+            const threshold = (tool === 'paint') ? brushSize * 0.05 :
+                              (tool === 'smooth') ? 0.0015 : 0.003;
             if (dist > threshold) {
-                applyTool(hit.point);
+                applyTool(hit);
                 lastHitPoint = hit.point.clone();
                 updateBrushIndicators(hit);
             }
@@ -1398,7 +1788,6 @@ document.addEventListener('pointermove', (e) => {
         return;
     }
 
-    // Hover mouse (tanpa tombol ditekan)
     if (!isSculpting && e.pointerType === 'mouse' && e.buttons === 0) {
         if (e.target !== canvas) return;
         const hit = hitSphere(e.clientX, e.clientY);
@@ -1412,14 +1801,18 @@ document.addEventListener('pointerup', (e) => {
 
     if (wasSculpting) {
         endSculptInternal();
-        if (e.pointerType === 'touch') {
-            controls.touches.ONE = TOUCH_ROTATE;
-        }
+        try { canvas.releasePointerCapture(e.pointerId); } catch(_) {}
+        if (e.pointerType === 'touch') controls.touches.ONE = TOUCH_ROTATE;
+    }
+
+    if (pickingActive) {
+        pickingActive = false;
+        controls.enabled = true;
     }
 
     if (activePointers.size === 0) {
         multiTouchActive = false;
-        controls.enabled = true;
+        if (!gizmoDragging) controls.enabled = true;
         controls.touches.ONE = TOUCH_ROTATE;
         if (e.pointerType !== 'mouse') {
             brushIndicator.visible = false;
@@ -1432,9 +1825,13 @@ document.addEventListener('pointercancel', (e) => {
     const wasSculpting = (e.pointerId === sculptPointerId);
     activePointers.delete(e.pointerId);
     if (wasSculpting) endSculptInternal();
+    if (pickingActive) {
+        pickingActive = false;
+        controls.enabled = true;
+    }
     if (activePointers.size === 0) {
         multiTouchActive = false;
-        controls.enabled = true;
+        if (!gizmoDragging) controls.enabled = true;
         controls.touches.ONE = TOUCH_ROTATE;
         brushIndicator.visible = false;
         brushIndicatorMirror.visible = false;
@@ -1483,9 +1880,11 @@ fileInput.addEventListener('change', (e) => {
             imgFlipH = false; imgFlipV = false;
             if (lockMirrorX) imgOffsetX = 0;
             updateImageSliders();
-            drawImageToTexture();
+            pushUndo();
+            drawImageToCanvas();
+            recomposeTexture();
             openImagePanel();
-            showToast('✅ Gambar dipasang');
+            showToast('✅ Gambar dipasang (tetap tajam)');
         };
         img.src = ev.target.result;
     };
@@ -1493,9 +1892,12 @@ fileInput.addEventListener('change', (e) => {
     fileInput.value = '';
 });
 
-function drawImageToTexture() {
-    clearTextureToWhite();
-    if (!uploadedImage) { canvasTexture.needsUpdate = true; return; }
+function drawImageToCanvas() {
+    imageCtx.globalAlpha = 1;
+    imageCtx.fillStyle = '#ffffff';
+    imageCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    if (!uploadedImage) return;
+
     const imgAspect = uploadedImage.width / uploadedImage.height;
     let baseW, baseH;
     if (imgAspect > 1) { baseW = TEX_SIZE; baseH = TEX_SIZE / imgAspect; }
@@ -1506,14 +1908,14 @@ function drawImageToTexture() {
     const finalOffsetU = lockMirrorX ? baseOffsetU : (baseOffsetU + imgOffsetX * 0.25);
     const cx = finalOffsetU * TEX_SIZE;
     const cy = (0.5 - imgOffsetY * 0.5) * TEX_SIZE;
-    textureCtx.save();
-    textureCtx.translate(cx, cy);
-    textureCtx.rotate(imgRotation * Math.PI / 180);
-    textureCtx.scale(imgFlipH ? -1 : 1, imgFlipV ? -1 : 1);
-    textureCtx.globalAlpha = imgOpacity;
-    textureCtx.drawImage(uploadedImage, -drawW/2, -drawH/2, drawW, drawH);
-    textureCtx.restore();
-    canvasTexture.needsUpdate = true;
+
+    imageCtx.save();
+    imageCtx.translate(cx, cy);
+    imageCtx.rotate(imgRotation * Math.PI / 180);
+    imageCtx.scale(imgFlipH ? -1 : 1, imgFlipV ? -1 : 1);
+    imageCtx.globalAlpha = imgOpacity;
+    imageCtx.drawImage(uploadedImage, -drawW/2, -drawH/2, drawW, drawH);
+    imageCtx.restore();
 }
 
 const controlsMap = [
@@ -1544,25 +1946,28 @@ controlsMap.forEach(c => {
         else if (c.id === 'imgRotation') imgRotation = v;
         else if (c.id === 'imgOpacity') imgOpacity = v;
         label.textContent = c.fmt(v);
-        drawImageToTexture();
+        drawImageToCanvas();
+        recomposeTexture();
     });
 });
 
-document.getElementById('flipH').addEventListener('click', () => { imgFlipH = !imgFlipH; drawImageToTexture(); });
-document.getElementById('flipV').addEventListener('click', () => { imgFlipV = !imgFlipV; drawImageToTexture(); });
+document.getElementById('flipH').addEventListener('click', () => { imgFlipH = !imgFlipH; drawImageToCanvas(); recomposeTexture(); });
+document.getElementById('flipV').addEventListener('click', () => { imgFlipV = !imgFlipV; drawImageToCanvas(); recomposeTexture(); });
 document.getElementById('resetImg').addEventListener('click', () => {
     imgOffsetX = 0; imgOffsetY = 0;
     imgScale = 1; imgWidth = 1; imgHeight = 1;
     imgRotation = 0; imgOpacity = 1;
     imgFlipH = false; imgFlipV = false;
     updateImageSliders();
-    drawImageToTexture();
+    drawImageToCanvas();
+    recomposeTexture();
     showToast('Reset gambar');
 });
 document.getElementById('removeImg').addEventListener('click', removeImage);
 
 document.getElementById('miniCenterMirror').addEventListener('click', () => {
     if (!uploadedImage) { showToast('⚠️ Upload gambar dulu', 'warn'); return; }
+    pushUndo();
     imgOffsetX = 0; imgOffsetY = 0;
     imgRotation = 0; imgScale = 1;
     imgWidth = 1; imgHeight = 1;
@@ -1570,11 +1975,13 @@ document.getElementById('miniCenterMirror').addEventListener('click', () => {
     lockMirrorX = true;
     document.getElementById('lockMirrorX').checked = true;
     updateImageSliders();
-    drawImageToTexture();
+    drawImageToCanvas();
+    recomposeTexture();
     showToast('🎯 Di tengah mirror');
 });
 
 document.getElementById('miniFitFace').addEventListener('click', () => {
+    pushUndo();
     imgOffsetX = 0; imgOffsetY = -0.05;
     imgScale = 1.0; imgWidth = 0.9; imgHeight = 0.95;
     imgRotation = 0; imgOpacity = 1;
@@ -1582,7 +1989,8 @@ document.getElementById('miniFitFace').addEventListener('click', () => {
     lockMirrorX = true;
     document.getElementById('lockMirrorX').checked = true;
     updateImageSliders();
-    drawImageToTexture();
+    drawImageToCanvas();
+    recomposeTexture();
     showToast('📐 Pas ke wajah');
 });
 
@@ -1591,7 +1999,8 @@ document.getElementById('lockMirrorX').addEventListener('change', (e) => {
     if (lockMirrorX) {
         imgOffsetX = 0;
         updateImageSliders();
-        drawImageToTexture();
+        drawImageToCanvas();
+        recomposeTexture();
         showToast('🔒 Terkunci di mirror');
     } else {
         showToast('🔓 Bebas digeser');
@@ -1617,16 +2026,19 @@ function updateImageSliders() {
 }
 
 function removeImage() {
+    pushUndo();
     uploadedImage = null;
-    clearTextureToWhite();
-    canvasTexture.needsUpdate = true;
+    imageCtx.fillStyle = '#ffffff';
+    imageCtx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    recomposeTexture();
     closeImagePanel();
     imageToggleBtn.classList.remove('show');
-    showToast('🗑️ Gambar dihapus');
+    showToast('🗑️ Gambar dihapus (lukisan tetap)');
 }
 
 imageToggleBtn.addEventListener('click', openImagePanel);
 
+// ==================== EXPORT ====================
 document.getElementById('exportBtn').addEventListener('click', exportModel);
 
 async function exportModel() {
@@ -1697,79 +2109,11 @@ function downloadBlob(blob, filename) {
 
 function bakeFinalTexture(size) {
     const cv = document.createElement('canvas');
-    cv.width = size; cv.height = size;
+    cv.width = cv.height = size;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
-
-    const posAttr = geometry.attributes.position;
-    const uvAttr = geometry.attributes.uv;
-    const colAttr = geometry.attributes.color;
-    const indexAttr = geometry.index;
-    const indices = indexAttr ? indexAttr.array : null;
-    const triCount = indices ? indices.length / 3 : posAttr.count / 3;
-
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const data = imgData.data;
-
-    for (let t = 0; t < triCount; t++) {
-        let i0, i1, i2;
-        if (indices) { i0 = indices[t*3]; i1 = indices[t*3 + 1]; i2 = indices[t*3 + 2]; }
-        else { i0 = t*3; i1 = t*3 + 1; i2 = t*3 + 2; }
-
-        const u0 = uvAttr.getX(i0) * size, v0 = (1 - uvAttr.getY(i0)) * size;
-        const u1 = uvAttr.getX(i1) * size, v1 = (1 - uvAttr.getY(i1)) * size;
-        const u2 = uvAttr.getX(i2) * size, v2 = (1 - uvAttr.getY(i2)) * size;
-
-        const c0 = [colAttr.getX(i0)*255, colAttr.getY(i0)*255, colAttr.getZ(i0)*255];
-        const c1 = [colAttr.getX(i1)*255, colAttr.getY(i1)*255, colAttr.getZ(i1)*255];
-        const c2 = [colAttr.getX(i2)*255, colAttr.getY(i2)*255, colAttr.getZ(i2)*255];
-
-        const minX = Math.max(0, Math.floor(Math.min(u0, u1, u2)));
-        const maxX = Math.min(size - 1, Math.ceil(Math.max(u0, u1, u2)));
-        const minY = Math.max(0, Math.floor(Math.min(v0, v1, v2)));
-        const maxY = Math.min(size - 1, Math.ceil(Math.max(v0, v1, v2)));
-
-        const denom = (v1 - v2)*(u0 - u2) + (u2 - u1)*(v0 - v2);
-        if (Math.abs(denom) < 0.0001) continue;
-
-        for (let y = minY; y <= maxY; y++) {
-            for (let x = minX; x <= maxX; x++) {
-                const px = x + 0.5, py = y + 0.5;
-                const w0 = ((v1 - v2)*(px - u2) + (u2 - u1)*(py - v2)) / denom;
-                const w1 = ((v2 - v0)*(px - u2) + (u0 - u2)*(py - v2)) / denom;
-                const w2 = 1 - w0 - w1;
-                if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
-                    const r = w0*c0[0] + w1*c1[0] + w2*c2[0];
-                    const g = w0*c0[1] + w1*c1[1] + w2*c2[1];
-                    const b = w0*c0[2] + w1*c1[2] + w2*c2[2];
-                    const idx = (y * size + x) * 4;
-                    data[idx] = r; data[idx+1] = g; data[idx+2] = b; data[idx+3] = 255;
-                }
-            }
-        }
-    }
-    ctx.putImageData(imgData, 0, 0);
-
-    if (uploadedImage) {
-        const imgAspect = uploadedImage.width / uploadedImage.height;
-        let baseW, baseH;
-        if (imgAspect > 1) { baseW = size; baseH = size / imgAspect; }
-        else { baseW = size * imgAspect; baseH = size; }
-        const drawW = baseW * imgScale * imgWidth;
-        const drawH = baseH * imgScale * imgHeight;
-        const baseOffsetU = FACE_U_CENTER;
-        const finalOffsetU = lockMirrorX ? baseOffsetU : (baseOffsetU + imgOffsetX * 0.25);
-        const cx = finalOffsetU * size;
-        const cy = (0.5 - imgOffsetY * 0.5) * size;
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(imgRotation * Math.PI / 180);
-        ctx.scale(imgFlipH ? -1 : 1, imgFlipV ? -1 : 1);
-        ctx.globalAlpha = imgOpacity;
-        ctx.drawImage(uploadedImage, -drawW/2, -drawH/2, drawW, drawH);
-        ctx.restore();
-    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(textureCanvas, 0, 0, size, size);
     return cv;
 }
 
@@ -1801,6 +2145,7 @@ function buildOBJ() {
     }
     return obj;
 }
+
 function buildMTL() {
     return `# MTL untuk model wajah 3D
 newmtl ModelMaterial
@@ -1839,6 +2184,10 @@ function showConfirm(title, message) {
         document.getElementById('confirmCancel').addEventListener('click', onCancel);
     });
 }
+
+// Init
+updateColorUI();
+drawBrushPreview();
 
 function animate() {
     requestAnimationFrame(animate);
