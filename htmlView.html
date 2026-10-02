@@ -1,0 +1,2473 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HTML Code Checker — Advanced</title>
+<style>
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+    margin: 0; background: #0d1117; color: #e6edf3;
+    font-family: Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+header { padding: 14px; background: #161b22; border-bottom: 1px solid #30363d; }
+header h2 { margin: 0; font-size: 17px; }
+
+.tabs { display: flex; padding: 12px 12px 0; }
+.tab {
+    flex: 1; padding: 12px 16px;
+    background: #161b22; color: #8b949e;
+    border: 1px solid #30363d; border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    font-size: 14px; font-weight: bold;
+    cursor: pointer; text-align: center;
+    transition: background .15s, color .15s;
+    user-select: none;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.tab + .tab { margin-left: 4px; }
+.tab.active {
+    background: #0d1117; color: #e6edf3;
+    margin-bottom: -1px; position: relative; z-index: 1;
+}
+.tab .dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 6px;
+    background: #30363d; vertical-align: middle;
+}
+.tab[data-tab="code"].active .dot { background: #58a6ff; }
+.tab[data-tab="preview"].active .dot { background: #3fb950; }
+.tab .count {
+    display: none;
+    background: #da3633; color: #fff;
+    border-radius: 10px; padding: 1px 7px;
+    font-size: 11px; margin-left: 6px;
+    font-weight: bold;
+}
+.tab .count.show { display: inline-block; }
+
+/* ===== TOMBOL COPY DI TAB ===== */
+.tab .copy-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    border-radius: 5px;
+    padding: 2px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-left: 4px;
+    transition: all .15s;
+    flex-shrink: 0;
+}
+.tab .copy-tab-btn:hover {
+    background: #1f6feb;
+    color: #fff;
+    border-color: #1f6feb;
+}
+.tab .copy-tab-btn:active {
+    transform: scale(.9);
+}
+.tab .copy-tab-btn.copied {
+    background: #238636;
+    color: #fff;
+    border-color: #2ea043;
+}
+
+.search-bar {
+    display: flex; gap: 6px; padding: 10px 12px;
+    margin: 8px 12px 0; background: #161b22;
+    border: 1px solid #30363d; border-radius: 8px;
+    align-items: center; flex-wrap: wrap;
+}
+.search-bar .search-icon { color: #8b949e; font-size: 16px; flex-shrink: 0; }
+.search-bar input[type="text"] {
+    flex: 1; min-width: 120px; background: #0d1117;
+    border: 1px solid #30363d; border-radius: 6px;
+    color: #e6edf3; padding: 8px 10px;
+    font-size: 13px; font-family: Consolas, monospace; outline: none;
+}
+.search-bar input[type="text"]:focus {
+    border-color: #1f6feb;
+    box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.25);
+}
+.search-bar input[type="text"].no-match {
+    border-color: #da3633;
+    box-shadow: 0 0 0 2px rgba(218, 54, 51, 0.25);
+}
+.search-bar button {
+    border: 0; border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; font-weight: bold;
+    cursor: pointer; color: white; flex-shrink: 0;
+}
+.search-bar button:active { transform: scale(.95); }
+.btn-search { background: #238636; padding: 8px 16px; }
+.btn-search:hover { background: #2ea043; }
+.btn-prev, .btn-next {
+    background: #21262d; color: #e6edf3;
+    padding: 8px 11px; border: 1px solid #30363d;
+}
+.btn-prev:hover:not(:disabled), .btn-next:hover:not(:disabled) { background: #30363d; }
+.btn-prev:disabled, .btn-next:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-clear-search { background: #484f58; padding: 8px 11px; }
+.search-toggles { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.toggle-btn {
+    background: #21262d; color: #8b949e;
+    border: 1px solid #30363d; border-radius: 6px;
+    padding: 6px 9px; font-size: 12px;
+    font-family: Consolas, monospace; font-weight: bold;
+    cursor: pointer; user-select: none;
+    min-width: 30px; text-align: center;
+}
+.toggle-btn:hover { background: #30363d; color: #e6edf3; }
+.toggle-btn.active { background: #1f6feb; color: white; border-color: #1f6feb; }
+.search-info {
+    font-size: 12px; color: #8b949e;
+    font-family: Consolas, monospace;
+    padding: 4px 8px; background: #0d1117;
+    border-radius: 4px; flex-shrink: 0;
+    min-width: 70px; text-align: center;
+}
+.search-info.has-match { color: #7ee787; }
+.search-info.no-match { color: #ff7b72; }
+.search-info.idle { color: #6e7681; }
+
+.workspace { padding: 0 12px 12px; }
+.panel {
+    display: none;
+    border: 1px solid #30363d;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+    background: #2b2b2b;
+}
+.panel.active { display: block; }
+
+.panel-header {
+    padding: 8px 12px; background: #161b22;
+    border-bottom: 1px solid #30363d;
+    font-size: 13px; font-weight: bold; color: #8b949e;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.panel-header .badge {
+    font-size: 11px; color: #6e7681;
+    background: #21262d; padding: 2px 8px; border-radius: 10px;
+}
+.panel-header .badge.live {
+    color: #7ee787; background: rgba(46, 160, 67, 0.15);
+    border: 1px solid #238636;
+}
+.panel-header .badge.dirty {
+    color: #d29922; background: rgba(210, 153, 34, 0.15);
+    border: 1px solid #9e6a03;
+}
+.panel-header .right-group-header {
+    display: flex; align-items: center; gap: 8px;
+}
+.panel-header .copy-panel-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #21262d; color: #8b949e;
+    border: 1px solid #30363d; border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; font-weight: bold;
+    cursor: pointer; transition: all .15s;
+}
+.panel-header .copy-panel-btn:hover {
+    background: #1f6feb; color: #fff; border-color: #1f6feb;
+}
+.panel-header .copy-panel-btn:active { transform: scale(.95); }
+.panel-header .copy-panel-btn.copied {
+    background: #238636; color: #fff; border-color: #2ea043;
+}
+
+/* ===== SLIDER UKURAN TEKS ===== */
+.font-size-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #0d1117;
+    border-bottom: 1px solid #30363d;
+    font-size: 12px;
+    color: #8b949e;
+}
+.font-size-control label {
+    flex-shrink: 0;
+    font-family: Consolas, monospace;
+    font-weight: bold;
+    color: #58a6ff;
+    min-width: 32px;
+    text-align: right;
+}
+.font-size-control input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #21262d;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    border: 1px solid #30363d;
+    min-width: 80px;
+}
+.font-size-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #1f6feb;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #58a6ff;
+    box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.25);
+    transition: transform .15s;
+}
+.font-size-control input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    background: #388bfd;
+}
+.font-size-control input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #1f6feb;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #58a6ff;
+    box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.25);
+    transition: transform .15s;
+}
+.font-size-control input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.15);
+    background: #388bfd;
+}
+.font-size-control .size-value {
+    font-family: Consolas, monospace;
+    font-size: 11px;
+    color: #7ee787;
+    background: #161b22;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid #238636;
+    min-width: 48px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.font-size-control .size-preset {
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-family: Consolas, monospace;
+    font-weight: bold;
+    cursor: pointer;
+    flex-shrink: 0;
+    user-select: none;
+}
+.font-size-control .size-preset:hover {
+    background: #30363d;
+    color: #e6edf3;
+}
+.font-size-control .size-preset.active {
+    background: #1f6feb;
+    color: #fff;
+    border-color: #1f6feb;
+}
+
+.editor { display: flex; width: 100%; height: 460px; overflow: hidden; position: relative; }
+
+:root {
+    --code-font-size: 11px;
+    --code-line-height: 18px;
+    --code-padding-y: 10px;
+    --code-padding-x: 10px;
+}
+
+.line-numbers {
+    width: 46px; flex-shrink: 0;
+    padding-top: var(--code-padding-y); padding-bottom: var(--code-padding-y); padding-right: 8px;
+    background: #161b22; color: #6e7681;
+    font-family: Consolas, monospace; font-size: var(--code-font-size); line-height: var(--code-line-height);
+    text-align: right; overflow: hidden; user-select: none;
+    border-right: 1px solid #30363d; z-index: 3; position: relative;
+}
+.line-number { height: var(--code-line-height); white-space: nowrap; cursor: pointer; padding-right: 4px; border-radius: 3px; }
+.line-number.error { color: #ff7b72; font-weight: bold; }
+.line-number.error::before { content: "🔴 "; font-size: 7px; }
+.line-number.warn { color: #d29922; font-weight: bold; }
+.line-number.warn::before { content: "⚠️ "; font-size: 7px; }
+.line-number.suggest { color: #79c0ff; font-weight: bold; background: rgba(56, 139, 253, 0.12); }
+.line-number.suggest::before { content: "📍 "; font-size: 8px; }
+.line-number.matched { background: #1f3a5f; color: #79c0ff; font-weight: bold; border-left: 3px solid #58a6ff; padding-left: 3px; }
+.line-number.active { background: #2d333b; color: #e6edf3; }
+.line-number.search-hit { background: #4a3d1a; color: #f0c674; }
+.line-number.search-current { background: #f0883e; color: #0d1117; font-weight: bold; }
+.line-number.flash {
+    background: #f0883e !important;
+    color: #0d1117 !important;
+    font-weight: bold;
+    animation: flashPulse .9s ease-out;
+}
+@keyframes flashPulse {
+    0%   { background: #ffd33d; }
+    100% { background: #f0883e; }
+}
+
+.code-wrapper { position: relative; flex: 1; width: 0; height: 100%; overflow: hidden; }
+#code {
+    position: absolute; inset: 0; width: 100%; height: 100%; resize: none;
+    border: 0; outline: 0; background: transparent; color: #8b949e;
+    padding: var(--code-padding-y) var(--code-padding-x);
+    font-family: Consolas, monospace; font-size: var(--code-font-size); line-height: var(--code-line-height);
+    white-space: pre; overflow: auto; tab-size: 4; z-index: 2;
+}
+#bracketOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+#lineHighlight {
+    position: absolute; left: 0; right: 0;
+    height: var(--code-line-height);
+    background: rgba(240, 136, 62, 0.28);
+    border-top: 1px solid #f0883e; border-bottom: 1px solid #f0883e;
+    pointer-events: none; opacity: 0;
+    transition: opacity .3s; z-index: 1;
+}
+#lineHighlight.show { opacity: 1; animation: highlightFade 1.6s ease-out forwards; }
+@keyframes highlightFade {
+    0%   { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+#lineSuggest {
+    position: absolute; left: 0; right: 0;
+    height: var(--code-line-height);
+    background: rgba(56, 139, 253, 0.22);
+    border-top: 1px dashed #58a6ff;
+    border-bottom: 1px dashed #58a6ff;
+    pointer-events: none;
+    display: none;
+    z-index: 1;
+}
+#lineSuggest.show { display: block; }
+#lineSuggest::after {
+    content: attr(data-label);
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: Consolas, monospace;
+    font-size: 10px;
+    font-weight: bold;
+    color: #58a6ff;
+    background: #0d1117;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid #58a6ff;
+    white-space: nowrap;
+}
+
+#searchOverlay {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1; overflow: hidden;
+}
+.search-match {
+    position: absolute;
+    background: rgba(240, 196, 116, 0.35);
+    border: 1px solid rgba(240, 196, 116, 0.7);
+    border-radius: 2px; pointer-events: none;
+}
+.search-match.current {
+    background: rgba(240, 136, 62, 0.55);
+    border: 1px solid #f0883e;
+    box-shadow: 0 0 0 1px #f0883e;
+}
+
+#iframe-wrap { width: 100%; height: 460px; background: #ffffff; position: relative; }
+#preview { display: block; width: 100%; height: 100%; border: 0; background: #ffffff; }
+#previewLoading {
+    position: absolute; inset: 0;
+    background: rgba(13, 17, 23, 0.75);
+    display: none;
+    align-items: center; justify-content: center;
+    color: #58a6ff; font-size: 13px;
+    font-family: Consolas, monospace;
+    z-index: 5;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+#previewLoading.show { display: flex; }
+#previewLoading .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid #30363d;
+    border-top-color: #58a6ff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+body.preview-mode { overflow: hidden; }
+body.preview-mode header,
+body.preview-mode .tabs,
+body.preview-mode .search-bar,
+body.preview-mode #panel-code,
+body.preview-mode .buttons,
+body.preview-mode .filters,
+body.preview-mode .goto-bar,
+body.preview-mode #status,
+body.preview-mode #errors,
+body.preview-mode .hint { display: none !important; }
+body.preview-mode .workspace { padding: 0; }
+body.preview-mode #panel-preview {
+    display: block !important;
+    position: fixed; inset: 0;
+    border: 0; border-radius: 0;
+    z-index: 9999;
+    background: #ffffff;
+}
+body.preview-mode #panel-preview .panel-header {
+    display: flex;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 0 12px;
+    background: rgba(22, 27, 34, 0.95);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-bottom: 1px solid #30363d;
+    z-index: 10000;
+    padding-top: env(safe-area-inset-top, 0);
+    height: calc(48px + env(safe-area-inset-top, 0px));
+}
+body.preview-mode #iframe-wrap {
+    position: fixed;
+    top: calc(48px + env(safe-area-inset-top, 0px));
+    left: 0; right: 0; bottom: 0;
+    width: 100%; height: auto;
+    background: #ffffff;
+}
+body.preview-mode #preview { width: 100%; height: 100%; }
+
+#backToCode {
+    display: none;
+    background: #1f6feb; color: white;
+    border: 0; border-radius: 6px;
+    padding: 7px 12px; font-size: 13px; font-weight: bold;
+    cursor: pointer; margin-left: 8px; flex-shrink: 0;
+}
+body.preview-mode #backToCode { display: inline-block; }
+
+#refreshPreview {
+    display: none;
+    background: #21262d; color: #e6edf3;
+    border: 1px solid #30363d; border-radius: 6px;
+    padding: 7px 10px; font-size: 13px; font-weight: bold;
+    cursor: pointer; flex-shrink: 0;
+}
+#refreshPreview:hover { background: #30363d; }
+body.preview-mode #refreshPreview { display: inline-block; }
+
+#panel-preview .panel-header .left-group {
+    display: flex; align-items: center; gap: 8px; min-width: 0;
+}
+#panel-preview .panel-header .right-group {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px; margin: 10px 0; }
+button.action { border: 0; border-radius: 7px; padding: 10px 14px; color: white; font-size: 14px; cursor: pointer; }
+button.action:active { transform: scale(.97); }
+.check { background: #1f6feb; } .run { background: #238636; }
+.format { background: #8250df; } .clear { background: #484f58; }
+.save { background: #2ea043; }
+.save:hover { background: #3fb950; }
+.open  { background: #bf8700; }
+.open:hover { background: #d4a017; }
+
+#status { margin: 10px 12px; padding: 11px; border-radius: 7px; background: #161b22; border: 1px solid #30363d; }
+.success { color: #7ee787; border-color: #238636 !important; }
+.error-status { color: #ff7b72; border-color: #da3633 !important; }
+.warn-status { color: #d29922; border-color: #9e6a03 !important; }
+
+#errors { display: flex; flex-direction: column; gap: 10px; margin: 10px 12px; }
+.error-item {
+    background: #161b22; border: 1px solid #30363d;
+    border-left: 4px solid #f85149; border-radius: 6px; padding: 10px;
+    cursor: pointer;
+}
+.error-item.warn { border-left-color: #d29922; }
+.error-item.warn .error-title { color: #d29922; }
+.error-title { color: #ff7b72; font-weight: bold; margin-bottom: 4px; }
+.error-location { color: #8b949e; font-family: monospace; font-size: 12px; margin-bottom: 6px; }
+
+.error-fix {
+    background: #0d2818; border: 1px solid #238636;
+    border-radius: 5px; padding: 8px; margin-top: 6px;
+    font-size: 13px; color: #7ee787;
+}
+.error-fix-label { font-weight: bold; color: #3fb950; margin-bottom: 3px; display: block; }
+.error-fix code {
+    display: block; background: #000; color: #7ee787;
+    padding: 6px 8px; border-radius: 4px; margin-top: 4px;
+    font-family: Consolas, monospace; font-size: 12px;
+    white-space: pre-wrap; word-break: break-all;
+}
+
+.error-suggest {
+    background: rgba(56, 139, 253, 0.08);
+    border: 1px solid #1f6feb;
+    border-radius: 5px;
+    padding: 8px;
+    margin-top: 6px;
+    font-size: 13px;
+    color: #79c0ff;
+}
+.error-suggest-label {
+    font-weight: bold;
+    color: #58a6ff;
+    margin-bottom: 4px;
+    display: block;
+}
+.error-suggest .suggest-line {
+    background: #0d1117;
+    border-left: 3px solid #58a6ff;
+    padding: 6px 10px;
+    margin-top: 4px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    color: #e6edf3;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border-radius: 3px;
+}
+.error-suggest .suggest-line .line-tag {
+    color: #6e7681;
+    font-size: 11px;
+    margin-right: 6px;
+}
+.error-suggest .suggest-line .new-content {
+    color: #7ee787;
+    font-weight: bold;
+}
+.error-suggest .suggest-line .arrow {
+    color: #6e7681;
+    margin: 0 6px;
+}
+
+.error-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn-goto {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #1f6feb; color: white;
+    border: 0; border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+}
+.btn-goto:hover { background: #388bfd; }
+.btn-goto:active { transform: scale(.95); background: #1158c7; }
+.btn-goto-suggest { background: #0d4a8a; border: 1px solid #58a6ff; }
+.btn-goto-suggest:hover { background: #1560a8; }
+
+.hint { margin: 0 12px 10px; font-size: 12px; color: #8b949e; font-style: italic; }
+
+.filters { display: flex; gap: 6px; margin: 8px 12px; flex-wrap: wrap; }
+.pill {
+    background: #21262d; border: 1px solid #30363d; color: #8b949e;
+    border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; user-select: none;
+}
+.pill.active { background: #1f6feb; color: white; border-color: #1f6feb; }
+
+.goto-bar {
+    display: flex; gap: 6px; margin: 8px 12px;
+    align-items: center; flex-wrap: wrap;
+}
+.goto-bar label { font-size: 12px; color: #8b949e; }
+.goto-bar input {
+    width: 90px; background: #0d1117;
+    border: 1px solid #30363d; border-radius: 6px;
+    color: #e6edf3; padding: 7px 10px;
+    font-size: 13px; font-family: Consolas, monospace; outline: none;
+}
+.goto-bar input:focus { border-color: #1f6feb; }
+.goto-bar button {
+    border: 0; border-radius: 6px; padding: 7px 12px;
+    background: #1f6feb; color: white;
+    font-size: 13px; font-weight: bold; cursor: pointer;
+}
+.goto-bar button:active { transform: scale(.96); }
+.goto-bar .err-nav { background: #da3633; }
+.goto-bar .err-nav:hover { background: #f85149; }
+.goto-bar .nav-info { font-size: 12px; color: #8b949e; font-family: Consolas, monospace; }
+
+/* ===== MODAL SIMPAN ===== */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 99998;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.modal-backdrop.show { display: flex; }
+.modal {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+.modal h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    color: #e6edf3;
+}
+.modal .subtitle {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 16px;
+}
+.modal label {
+    display: block;
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 4px;
+    margin-top: 12px;
+}
+.modal input[type="text"] {
+    width: 100%;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #e6edf3;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: Consolas, monospace;
+    outline: none;
+}
+.modal input[type="text"]:focus {
+    border-color: #1f6feb;
+    box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.25);
+}
+.modal .filename-preview {
+    font-size: 11px;
+    color: #6e7681;
+    margin-top: 4px;
+    font-family: Consolas, monospace;
+}
+.modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+.modal-actions button {
+    border: 0;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    color: white;
+}
+.modal-actions button:active { transform: scale(.97); }
+.btn-cancel { background: #484f58; }
+.btn-cancel:hover { background: #5a626b; }
+.btn-confirm { background: #2ea043; }
+.btn-confirm:hover { background: #3fb950; }
+</style>
+</head>
+<body>
+
+<header>
+    <h2>🔍 HTML / CSS / JavaScript Checker</h2>
+</header>
+
+<div class="tabs">
+    <div class="tab active" data-tab="code">
+        <span class="dot"></span>📝 Kode
+        <button class="copy-tab-btn" id="copyTabBtn" title="Copy semua kode" type="button">📋</button>
+        <span class="count" id="errCountBadge">0</span>
+    </div>
+    <div class="tab" data-tab="preview">
+        <span class="dot"></span>▶ Preview
+    </div>
+</div>
+
+<div class="search-bar" id="searchBar">
+    <span class="search-icon">🔎</span>
+    <input type="text" id="searchInput" placeholder="Ketik kata, lalu tekan Cari..." autocomplete="off" spellcheck="false">
+    <div class="search-toggles">
+        <div class="toggle-btn" id="caseToggle" title="Case sensitive">Aa</div>
+        <div class="toggle-btn" id="regexToggle" title="Regex">.*</div>
+        <div class="toggle-btn" id="wholeToggle" title="Whole word">ab|</div>
+    </div>
+    <button class="btn-search" id="btnSearch">🔍 Cari</button>
+    <span class="search-info idle" id="searchInfo">—</span>
+    <button class="btn-prev" id="btnPrev" disabled>▲</button>
+    <button class="btn-next" id="btnNext" disabled>▼</button>
+    <button class="btn-clear-search" id="btnClearSearch">✕</button>
+</div>
+
+<div class="workspace">
+    <div class="panel active" id="panel-code">
+        <div class="panel-header">
+            <span>📝 Kode Editor</span>
+            <div class="right-group-header">
+                <button class="copy-panel-btn" id="copyPanelBtn" type="button" title="Copy semua kode">
+                    📋 Copy
+                </button>
+                <span class="badge">HTML · CSS · JS</span>
+            </div>
+        </div>
+        <div class="font-size-control">
+            <label for="fontSlider">Aa</label>
+            <input type="range" id="fontSlider" min="8" max="15" step="1" value="11">
+            <span class="size-value" id="sizeValue">11px</span>
+            <div class="size-preset" data-size="9">S</div>
+            <div class="size-preset active" data-size="11">M</div>
+            <div class="size-preset" data-size="14">L</div>
+            <div class="size-preset" data-size="18">XL</div>
+        </div>
+        <div class="editor">
+            <div id="lineNumbers" class="line-numbers"></div>
+            <div class="code-wrapper" id="codeWrapper">
+                <svg id="bracketOverlay"></svg>
+                <div id="lineSuggest"></div>
+                <div id="searchOverlay"></div>
+                <div id="lineHighlight"></div>
+                <textarea id="code" spellcheck="false" wrap="off"><!DOCTYPE html>
+<html>
+<head>
+<style>
+body {
+    margin: 0;
+    backgrond: black;
+    color: red
+}
+
+.box {
+    width: 100px
+    height: 100px;
+    transfrom: rotate(45deg);
+    margin: ;
+}
+</style>
+</head>
+<body>
+<div clas="box"></div>
+<script>
+functon test() {
+    var x = 10;
+    if (true) {
+        console.log("Hello");
+    }
+}
+
+test();
+</script>
+</body>
+</html></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" id="panel-preview">
+        <div class="panel-header">
+            <div class="left-group">
+                <span>▶ Preview</span>
+                <span class="badge" id="previewStatus">kosong</span>
+            </div>
+            <div class="right-group">
+                <button id="refreshPreview" onclick="renderPreview(true)" title="Render ulang">🔄</button>
+                <button id="backToCode" onclick="exitPreviewMode()">← Kode</button>
+            </div>
+        </div>
+        <div id="iframe-wrap">
+            <div id="previewLoading">
+                <div class="spinner"></div>
+                Rendering...
+            </div>
+            <iframe id="preview" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe>
+        </div>
+    </div>
+</div>
+
+<div class="buttons">
+    <button class="action check"  onclick="checkAll()">🔍 Periksa</button>
+    <button class="action run"    onclick="runCode()">▶ Jalankan</button>
+    <button class="action format" onclick="formatHTML()">✨ Format</button>
+    <button class="action save"   onclick="openSaveModal()">💾 Simpan</button>
+    <button class="action open"   onclick="openLoadFile()">📂 Buka File</button>
+    <button class="action clear"  onclick="clearCode()">🗑 Bersihkan</button>
+</div>
+
+<input type="file" id="loadFileInput" accept=".html,.htm,.txt,.css,.js" style="display:none">
+
+<div class="goto-bar">
+    <label for="gotoInput">Lompat ke baris:</label>
+    <input type="number" id="gotoInput" min="1" placeholder="1000">
+    <button onclick="gotoLineFromInput()">🎯 Ke Baris</button>
+    <button class="err-nav" onclick="gotoNextError()">▼ Error Berikutnya</button>
+    <button class="err-nav" onclick="gotoPrevError()">▲ Error Sebelumnya</button>
+    <span class="nav-info" id="navInfo"></span>
+</div>
+
+<div class="filters">
+    <div class="pill active" data-filter="all">Semua</div>
+    <div class="pill" data-filter="html">HTML</div>
+    <div class="pill" data-filter="css">CSS</div>
+    <div class="pill" data-filter="js">JavaScript</div>
+</div>
+
+<div id="status">Belum diperiksa.</div>
+<div id="errors"></div>
+
+<div class="hint">
+    💡 Klik <b>💾 Simpan</b> untuk unduh file .html ke folder Downloads / Documents. Gunakan tombol <b>📋 Copy</b> untuk menyalin semua kode.
+</div>
+
+<!-- ===== MODAL SIMPAN ===== -->
+<div class="modal-backdrop" id="saveModal">
+    <div class="modal">
+        <h3>💾 Simpan Kode</h3>
+        <div class="subtitle">File akan diunduh ke folder Download/Documents perangkat.</div>
+
+        <label for="saveFileName">Nama file</label>
+        <input type="text" id="saveFileName" placeholder="index" autocomplete="off" spellcheck="false">
+        <div class="filename-preview" id="filenamePreview">index.html</div>
+
+        <label for="saveFormat">Format file</label>
+        <select id="saveFormat" style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:10px 12px;font-size:14px;font-family:Consolas,monospace;outline:none;">
+            <option value="html">.html — Dokumen HTML lengkap</option>
+            <option value="htm">.htm — HTML (alternatif)</option>
+            <option value="txt">.txt — Teks biasa</option>
+        </select>
+
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeSaveModal()">Batal</button>
+            <button class="btn-confirm" onclick="confirmSave()">💾 Simpan</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* =====================================================
+   STATE
+===================================================== */
+let lastRenderedCode = null;
+let lastSuggestLine = null;
+let currentFileName = "index";
+
+/* =====================================================
+   FITUR COPY KODE
+===================================================== */
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+    }
+    // Fallback untuk browser lama
+    return new Promise((resolve, reject) => {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "-9999px";
+        ta.setAttribute("readonly", "");
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        try {
+            const ok = document.execCommand("copy");
+            document.body.removeChild(ta);
+            ok ? resolve() : reject(new Error("execCommand copy gagal"));
+        } catch (err) {
+            document.body.removeChild(ta);
+            reject(err);
+        }
+    });
+}
+
+function showCopyFeedback(button) {
+    if (!button) return;
+    const originalHTML = button.innerHTML;
+    button.classList.add("copied");
+    button.innerHTML = "✅";
+    clearTimeout(button.__copyTimer);
+    button.__copyTimer = setTimeout(() => {
+        button.classList.remove("copied");
+        button.innerHTML = originalHTML;
+    }, 1500);
+}
+
+function copyAllCode(button) {
+    const code = document.getElementById("code").value;
+    if (!code.trim()) {
+        showToastError("⚠️ Tidak ada kode untuk disalin.");
+        return;
+    }
+    copyToClipboard(code)
+        .then(() => {
+            showToast("📋 Kode berhasil disalin ke clipboard!");
+            showCopyFeedback(button);
+        })
+        .catch(() => {
+            // Fallback: pilih semua di textarea
+            const ta = document.getElementById("code");
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand("copy");
+                showToast("📋 Kode disalin (mode fallback).");
+                showCopyFeedback(button);
+            } catch (e) {
+                showToastError("❌ Gagal menyalin kode.");
+            }
+        });
+}
+
+// Tombol copy di tab "Kode"
+document.getElementById("copyTabBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    copyAllCode(e.currentTarget);
+});
+
+// Tombol copy di panel header editor
+document.getElementById("copyPanelBtn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    copyAllCode(e.currentTarget);
+});
+
+/* =====================================================
+   SIMPAN KE FOLDER (DOWNLOAD)
+===================================================== */
+function openSaveModal() {
+    const modal = document.getElementById("saveModal");
+    const nameInput = document.getElementById("saveFileName");
+    const formatSelect = document.getElementById("saveFormat");
+
+    nameInput.value = currentFileName || "index";
+    updateFilenamePreview();
+    modal.classList.add("show");
+    setTimeout(() => { nameInput.focus(); nameInput.select(); }, 50);
+}
+function closeSaveModal() {
+    document.getElementById("saveModal").classList.remove("show");
+}
+function updateFilenamePreview() {
+    const name = document.getElementById("saveFileName").value.trim() || "index";
+    const fmt = document.getElementById("saveFormat").value;
+    document.getElementById("filenamePreview").textContent = name + "." + fmt;
+}
+function confirmSave() {
+    let name = document.getElementById("saveFileName").value.trim() || "index";
+    const fmt = document.getElementById("saveFormat").value;
+
+    name = name.replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
+    if (!/\.(html|htm|txt)$/i.test(name)) {
+    } else {
+        const ext = name.match(/\.(html|htm|txt)$/i)[1].toLowerCase();
+        name = name.replace(/\.(html|htm|txt)$/i, "");
+        document.getElementById("saveFormat").value = ext;
+    }
+
+    const filename = name + "." + fmt;
+    const content = codeArea.value;
+
+    const blob = new Blob([content], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+
+    currentFileName = name;
+    document.title = filename + " — HTML Code Checker";
+    showToast("✅ Tersimpan: " + filename);
+
+    closeSaveModal();
+}
+
+function showToast(msg, duration = 2500) {
+    let toast = document.getElementById("__toast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "__toast";
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #161b22;
+            border: 1px solid #2ea043;
+            color: #7ee787;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            z-index: 999999;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity .25s, transform .25s;
+            pointer-events: none;
+            max-width: 90%;
+            text-align: center;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.borderColor = "#2ea043";
+    toast.style.color = "#7ee787";
+    requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateX(-50%) translateY(0)";
+    });
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(-50%) translateY(20px)";
+    }, duration);
+}
+function showToastError(msg, duration = 2500) {
+    let toast = document.getElementById("__toast");
+    if (!toast) {
+        showToast(msg, duration);
+        toast = document.getElementById("__toast");
+    }
+    toast.style.borderColor = "#da3633";
+    toast.style.color = "#ff7b72";
+    toast.textContent = msg;
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(-50%) translateY(20px)";
+    }, duration);
+}
+
+/* =====================================================
+   BUKA FILE dari folder
+===================================================== */
+function openLoadFile() {
+    document.getElementById("loadFileInput").click();
+}
+document.getElementById("loadFileInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        codeArea.value = evt.target.result;
+        const baseName = file.name.replace(/\.[^.]+$/, "");
+        currentFileName = baseName;
+        document.title = file.name + " — HTML Code Checker";
+        lastRenderedCode = null;
+        document.getElementById("previewStatus").textContent = "siap";
+        document.getElementById("previewStatus").classList.remove("live");
+
+        updateLineNumbers();
+        updateBracketMatching();
+        showToast("📂 Dibuka: " + file.name);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+});
+
+document.getElementById("saveModal").addEventListener("click", (e) => {
+    if (e.target.id === "saveModal") closeSaveModal();
+});
+document.getElementById("saveFileName").addEventListener("input", updateFilenamePreview);
+document.getElementById("saveFormat").addEventListener("change", updateFilenamePreview);
+document.getElementById("saveFileName").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); confirmSave(); }
+    if (e.key === "Escape") { e.preventDefault(); closeSaveModal(); }
+});
+
+document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        openSaveModal();
+    }
+});
+
+/* =====================================================
+   TAB SWITCHER
+===================================================== */
+function switchTab(name) {
+    document.querySelectorAll(".tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.tab === name);
+    });
+    document.querySelectorAll(".panel").forEach(p => {
+        p.classList.toggle("active", p.id === "panel-" + name);
+    });
+    if (name === "preview") {
+        enterPreviewMode();
+        renderPreview(false);
+    } else {
+        exitPreviewMode();
+        cachedCharW = 0;
+        setTimeout(() => { updateBracketMatching(); redrawSearchHighlights(); }, 30);
+    }
+}
+function enterPreviewMode() { document.body.classList.add("preview-mode"); }
+function exitPreviewMode() {
+    document.body.classList.remove("preview-mode");
+    document.getElementById("previewLoading").classList.remove("show");
+}
+
+function renderPreview(showLoading) {
+    const iframe = document.getElementById("preview");
+    const status = document.getElementById("previewStatus");
+    const loading = document.getElementById("previewLoading");
+    const code = codeArea.value;
+
+    if (!code.trim()) {
+        iframe.srcdoc = "<!DOCTYPE html><html><body style='margin:0;background:#0d1117;color:#6e7681;font-family:Arial;display:flex;align-items:center;justify-content:center;height:100vh;'><div>Preview kosong</div></body></html>";
+        status.textContent = "kosong";
+        status.classList.remove("live", "dirty");
+        return;
+    }
+    if (showLoading) loading.classList.add("show");
+    iframe.srcdoc = "";
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            try {
+                iframe.srcdoc = code;
+                lastRenderedCode = code;
+                status.textContent = "live";
+                status.classList.remove("dirty");
+                status.classList.add("live");
+                iframe.addEventListener("load", () => loading.classList.remove("show"), { once: true });
+                setTimeout(() => loading.classList.remove("show"), 800);
+            } catch (e) {
+                loading.classList.remove("show");
+                status.textContent = "error";
+                status.classList.remove("live", "dirty");
+            }
+        });
+    });
+}
+function runCode() { renderPreview(true); switchTab("preview"); }
+document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+});
+
+/* =====================================================
+   BAGIAN INTI
+===================================================== */
+const codeArea    = document.getElementById("code");
+const lineNumbers = document.getElementById("lineNumbers");
+const overlay     = document.getElementById("bracketOverlay");
+const lineHighlight = document.getElementById("lineHighlight");
+const lineSuggest = document.getElementById("lineSuggest");
+const searchOverlay = document.getElementById("searchOverlay");
+const codeWrapper = document.getElementById("codeWrapper");
+
+window.__lastErrorLines = [];
+window.__lastWarnLines  = [];
+window.__lastSuggestLines = [];
+window.__allErrors      = [];
+window.__activeFilter   = "all";
+window.__currentErrorIndex = -1;
+
+codeArea.addEventListener("input", () => {
+    const status = document.getElementById("previewStatus");
+    if (lastRenderedCode !== null && lastRenderedCode !== codeArea.value) {
+        if (status.textContent === "live") {
+            status.textContent = "perlu refresh";
+            status.classList.remove("live");
+            status.classList.add("dirty");
+        }
+    } else if (lastRenderedCode === null && codeArea.value.trim()) {
+        if (status.textContent !== "siap") {
+            status.textContent = "siap";
+            status.classList.remove("live", "dirty");
+        }
+    }
+});
+
+/* =====================================================
+   ANALISIS BRACKET — TITIK TUTUP
+===================================================== */
+function analyzeUnclosedBracket(text, openIndex, openChar) {
+    const closeChar = { "(": ")", "{": "}", "[": "]" }[openChar];
+    const lines = text.split("\n");
+    const openPos = positionFromIndex(text, openIndex);
+
+    let depth = 1;
+    let scanIdx = openIndex + 1;
+    let blockEndIndex = text.length;
+    while (scanIdx < text.length && depth > 0) {
+        const c = text[scanIdx];
+        if (c === openChar) depth++;
+        else if (c === closeChar) {
+            depth--;
+            if (depth === 0) { blockEndIndex = scanIdx; break; }
+        }
+        scanIdx++;
+    }
+
+    let endLine;
+    if (depth === 0) {
+        const closePos = positionFromIndex(text, blockEndIndex);
+        endLine = closePos.line;
+    } else {
+        endLine = lines.length;
+    }
+
+    let suggestLine = endLine;
+    for (let i = endLine - 1; i >= openPos.line - 1; i--) {
+        const lineText = lines[i] || "";
+        const stripped = lineText.replace(/\/\/.*$/, "").replace(/\/\*[\s\S]*?\*\//g, "").trim();
+        if (stripped !== "") {
+            suggestLine = i + 1;
+            break;
+        }
+    }
+    if (suggestLine < openPos.line) suggestLine = openPos.line;
+
+    const beforeLine = lines[suggestLine - 1] || "";
+    const afterLine = lines[suggestLine] || "";
+    const openIndent = lines[openPos.line - 1].match(/^(\s*)/)[1];
+    const suggestion = openIndent + closeChar;
+
+    return {
+        closeChar,
+        openLine: openPos.line,
+        suggestLine, endLine,
+        beforeLine, afterLine,
+        suggestion,
+        openIndent
+    };
+}
+
+/* =====================================================
+   MESIN PENCARIAN — MANUAL
+===================================================== */
+const searchInput   = document.getElementById("searchInput");
+const searchInfo    = document.getElementById("searchInfo");
+const caseToggle    = document.getElementById("caseToggle");
+const regexToggle   = document.getElementById("regexToggle");
+const wholeToggle   = document.getElementById("wholeToggle");
+const btnSearch     = document.getElementById("btnSearch");
+const btnNext       = document.getElementById("btnNext");
+const btnPrev       = document.getElementById("btnPrev");
+const btnClearSearch = document.getElementById("btnClearSearch");
+
+window.__searchQuery   = "";
+window.__searchMatches = [];
+window.__searchIndex   = -1;
+window.__searchCase    = false;
+window.__searchRegex   = false;
+window.__searchWhole   = false;
+
+function buildSearchRegex(query) {
+    if (!query) return null;
+    let pattern = window.__searchRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (window.__searchWhole) pattern = "\\b" + pattern + "\\b";
+    const flags = "g" + (window.__searchCase ? "" : "i");
+    try { return new RegExp(pattern, flags); } catch (e) { return null; }
+}
+function performSearch() {
+    const query = searchInput.value;
+    window.__searchQuery = query;
+    window.__searchMatches = [];
+    window.__searchIndex = -1;
+    if (!query) {
+        searchInput.classList.remove("no-match");
+        updateSearchInfo("idle"); redrawSearchHighlights();
+        updateSearchLineNumbers(); updateNavButtons();
+        return;
+    }
+    const regex = buildSearchRegex(query);
+    if (!regex) {
+        searchInput.classList.add("no-match");
+        updateSearchInfo("Regex tidak valid");
+        updateNavButtons(); return;
+    }
+    const text = codeArea.value;
+    let m, safety = 0;
+    while ((m = regex.exec(text)) !== null && safety++ < 10000) {
+        if (m[0].length === 0) { regex.lastIndex++; continue; }
+        const pos = positionFromIndex(text, m.index);
+        window.__searchMatches.push({
+            start: m.index, end: m.index + m[0].length,
+            line: pos.line, col: pos.column, text: m[0]
+        });
+    }
+    if (window.__searchMatches.length > 0) {
+        window.__searchIndex = 0;
+        searchInput.classList.remove("no-match");
+        updateSearchInfo(); redrawSearchHighlights();
+        updateSearchLineNumbers(); updateNavButtons();
+        scrollToSearchMatch(0);
+    } else {
+        searchInput.classList.add("no-match");
+        updateSearchInfo(); redrawSearchHighlights();
+        updateSearchLineNumbers(); updateNavButtons();
+    }
+}
+function updateSearchInfo(customState) {
+    const total = window.__searchMatches.length;
+    if (customState === "idle" || !window.__searchQuery) {
+        searchInfo.textContent = "—"; searchInfo.className = "search-info idle"; return;
+    }
+    if (typeof customState === "string" && customState !== "idle") {
+        searchInfo.textContent = customState; searchInfo.className = "search-info no-match"; return;
+    }
+    if (total === 0) { searchInfo.textContent = "0/0"; searchInfo.className = "search-info no-match"; return; }
+    searchInfo.textContent = (window.__searchIndex + 1) + "/" + total;
+    searchInfo.className = "search-info has-match";
+}
+function updateNavButtons() {
+    const has = window.__searchMatches.length > 0;
+    btnNext.disabled = !has; btnPrev.disabled = !has;
+}
+function redrawSearchHighlights() {
+    searchOverlay.innerHTML = "";
+    if (!window.__searchQuery || window.__searchMatches.length === 0) {
+        codeWrapper.classList.remove("search-active"); return;
+    }
+    codeWrapper.classList.add("search-active");
+    const lineH = parseFloat(getComputedStyle(codeArea).lineHeight);
+    const padY  = parseFloat(getComputedStyle(codeArea).paddingTop);
+    const padX  = parseFloat(getComputedStyle(codeArea).paddingLeft);
+    const sTop  = codeArea.scrollTop;
+    const sLeft = codeArea.scrollLeft;
+    const charW = measureCharWidth();
+    const viewH = codeArea.clientHeight;
+    const viewW = codeArea.clientWidth;
+    window.__searchMatches.forEach((match, idx) => {
+        const y = (match.line - 1) * lineH + padY - sTop;
+        if (y + lineH < 0 || y > viewH) return;
+        const matchText = match.text;
+        const linesInMatch = matchText.split("\n");
+        if (linesInMatch.length === 1) {
+            const x = (match.col - 1) * charW + padX - sLeft;
+            const w = matchText.length * charW;
+            if (x + w < 0 || x > viewW + 50) return;
+            const el = document.createElement("div");
+            el.className = "search-match" + (idx === window.__searchIndex ? " current" : "");
+            el.style.left = x + "px"; el.style.top = y + "px";
+            el.style.width = w + "px"; el.style.height = lineH + "px";
+            searchOverlay.appendChild(el);
+        } else {
+            linesInMatch.forEach((part, i) => {
+                const yLine = y + i * lineH;
+                if (yLine + lineH < 0 || yLine > viewH) return;
+                const xStart = (i === 0) ? (match.col - 1) * charW + padX - sLeft : padX - sLeft;
+                const w = part.length * charW;
+                if (w === 0) return;
+                const el = document.createElement("div");
+                el.className = "search-match" + (idx === window.__searchIndex ? " current" : "");
+                el.style.left = xStart + "px"; el.style.top = yLine + "px";
+                el.style.width = w + "px"; el.style.height = lineH + "px";
+                searchOverlay.appendChild(el);
+            });
+        }
+    });
+}
+function updateSearchLineNumbers() {
+    lineNumbers.querySelectorAll(".line-number").forEach(n => n.classList.remove("search-hit", "search-current"));
+    if (!window.__searchMatches.length) return;
+    const hitLines = new Set();
+    window.__searchMatches.forEach(m => hitLines.add(m.line));
+    hitLines.forEach(line => {
+        const el = lineNumbers.querySelector('.line-number[data-line="' + line + '"]');
+        if (el) el.classList.add("search-hit");
+    });
+    if (window.__searchIndex >= 0 && window.__searchMatches[window.__searchIndex]) {
+        const curLine = window.__searchMatches[window.__searchIndex].line;
+        const el = lineNumbers.querySelector('.line-number[data-line="' + curLine + '"]');
+        if (el) el.classList.add("search-current");
+    }
+}
+function scrollToSearchMatch(idx) {
+    const match = window.__searchMatches[idx];
+    if (!match) return;
+    window.__searchIndex = idx;
+    const lineH = parseFloat(getComputedStyle(codeArea).lineHeight);
+    const padY  = parseFloat(getComputedStyle(codeArea).paddingTop);
+    const targetY = (match.line - 1) * lineH + padY;
+    const viewH = codeArea.clientHeight;
+    codeArea.scrollTop = Math.max(0, targetY - viewH / 2 + lineH / 2);
+    lineNumbers.scrollTop = codeArea.scrollTop;
+    codeArea.focus();
+    try { codeArea.setSelectionRange(match.start, match.end); } catch (e) {}
+    updateSearchInfo(); redrawSearchHighlights();
+    updateSearchLineNumbers(); updateBracketMatching();
+}
+function searchNext() {
+    if (!window.__searchMatches.length) return;
+    scrollToSearchMatch((window.__searchIndex + 1) % window.__searchMatches.length);
+}
+function searchPrev() {
+    if (!window.__searchMatches.length) return;
+    scrollToSearchMatch((window.__searchIndex - 1 + window.__searchMatches.length) % window.__searchMatches.length);
+}
+function clearSearch() {
+    searchInput.value = "";
+    window.__searchQuery = "";
+    window.__searchMatches = [];
+    window.__searchIndex = -1;
+    searchInput.classList.remove("no-match");
+    searchOverlay.innerHTML = "";
+    codeWrapper.classList.remove("search-active");
+    updateSearchInfo("idle"); updateSearchLineNumbers(); updateNavButtons();
+    codeArea.focus();
+}
+btnSearch.addEventListener("click", () => {
+    if (!searchInput.value.trim()) { searchInput.focus(); return; }
+    performSearch();
+});
+searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        if (e.shiftKey) {
+            if (!window.__searchMatches.length) performSearch(); else searchPrev();
+        } else {
+            if (!window.__searchMatches.length || window.__searchQuery !== searchInput.value) performSearch();
+            else searchNext();
+        }
+    } else if (e.key === "Escape") { e.preventDefault(); clearSearch(); }
+});
+btnNext.addEventListener("click", searchNext);
+btnPrev.addEventListener("click", searchPrev);
+btnClearSearch.addEventListener("click", clearSearch);
+caseToggle.addEventListener("click", () => {
+    window.__searchCase = !window.__searchCase;
+    caseToggle.classList.toggle("active", window.__searchCase);
+    if (searchInput.value.trim()) performSearch();
+});
+regexToggle.addEventListener("click", () => {
+    window.__searchRegex = !window.__searchRegex;
+    regexToggle.classList.toggle("active", window.__searchRegex);
+    if (searchInput.value.trim()) performSearch();
+});
+wholeToggle.addEventListener("click", () => {
+    window.__searchWhole = !window.__searchWhole;
+    wholeToggle.classList.toggle("active", window.__searchWhole);
+    if (searchInput.value.trim()) performSearch();
+});
+document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault(); searchInput.focus(); searchInput.select();
+    }
+});
+
+/* =====================================================
+   SCROLL & HIGHLIGHT
+===================================================== */
+function scrollToLine(line, flash = true) {
+    exitPreviewMode();
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "code"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-code"));
+    const lineH = parseFloat(getComputedStyle(codeArea).lineHeight);
+    const padY  = parseFloat(getComputedStyle(codeArea).paddingTop);
+    const targetY = (line - 1) * lineH + padY;
+    const viewH = codeArea.clientHeight;
+    codeArea.scrollTop = Math.max(0, targetY - viewH / 2 + lineH / 2);
+    lineNumbers.scrollTop = codeArea.scrollTop;
+    const lines = codeArea.value.split("\n");
+    let index = 0;
+    for (let i = 0; i < line - 1 && i < lines.length; i++) index += lines[i].length + 1;
+    codeArea.focus();
+    codeArea.setSelectionRange(index, index);
+    if (flash) {
+        const rectTop = targetY - codeArea.scrollTop;
+        lineHighlight.style.top = rectTop + "px";
+        lineHighlight.classList.remove("show");
+        void lineHighlight.offsetWidth;
+        lineHighlight.classList.add("show");
+        setTimeout(() => lineHighlight.classList.remove("show"), 1700);
+        const numEl = lineNumbers.querySelector('.line-number[data-line="' + line + '"]');
+        if (numEl) {
+            numEl.classList.add("flash");
+            setTimeout(() => numEl.classList.remove("flash"), 1500);
+        }
+    }
+    updateBracketMatching();
+    redrawSearchHighlights();
+}
+function scrollToSuggestLine(line, closeChar, indent) {
+    exitPreviewMode();
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "code"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-code"));
+    const lineH = parseFloat(getComputedStyle(codeArea).lineHeight);
+    const padY  = parseFloat(getComputedStyle(codeArea).paddingTop);
+    const targetY = (line - 1) * lineH + padY;
+    const viewH = codeArea.clientHeight;
+    codeArea.scrollTop = Math.max(0, targetY - viewH / 2 + lineH / 2);
+    lineNumbers.scrollTop = codeArea.scrollTop;
+    const rectTop = targetY - codeArea.scrollTop;
+    lineSuggest.style.top = (rectTop - lineH) + "px";
+    lineSuggest.setAttribute("data-label", "📍 di sini: " + (indent || "") + closeChar);
+    lineSuggest.classList.add("show");
+    lastSuggestLine = line;
+    const numEl = lineNumbers.querySelector('.line-number[data-line="' + line + '"]');
+    if (numEl) {
+        numEl.classList.add("suggest");
+        setTimeout(() => numEl.classList.remove("suggest"), 3500);
+    }
+    clearTimeout(window.__suggestTimeout);
+    window.__suggestTimeout = setTimeout(() => {
+        lineSuggest.classList.remove("show");
+    }, 3500);
+}
+function gotoLineFromInput() {
+    const input = document.getElementById("gotoInput");
+    const line = parseInt(input.value, 10);
+    const total = codeArea.value.split("\n").length;
+    if (isNaN(line) || line < 1 || line > total) {
+        alert("Baris tidak valid. Total baris: " + total);
+        return;
+    }
+    scrollToLine(line);
+}
+function gotoNextError() {
+    const list = window.__allErrors;
+    if (!list.length) { alert("Belum ada error. Klik 🔍 Periksa dulu."); return; }
+    window.__currentErrorIndex = (window.__currentErrorIndex + 1) % list.length;
+    const err = list[window.__currentErrorIndex];
+    scrollToLine(err.line);
+    updateNavInfo();
+    highlightErrorCard(window.__currentErrorIndex);
+}
+function gotoPrevError() {
+    const list = window.__allErrors;
+    if (!list.length) { alert("Belum ada error. Klik 🔍 Periksa dulu."); return; }
+    window.__currentErrorIndex = (window.__currentErrorIndex - 1 + list.length) % list.length;
+    const err = list[window.__currentErrorIndex];
+    scrollToLine(err.line);
+    updateNavInfo();
+    highlightErrorCard(window.__currentErrorIndex);
+}
+function updateNavInfo() {
+    const list = window.__allErrors;
+    const info = document.getElementById("navInfo");
+    if (!list.length) { info.textContent = ""; return; }
+    info.textContent = "Error " + (window.__currentErrorIndex + 1) + "/" + list.length;
+}
+function highlightErrorCard(idx) {
+    const cards = document.querySelectorAll("#errors .error-item");
+    cards.forEach((c) => { c.style.outline = ""; c.style.background = ""; });
+    if (cards[idx]) {
+        cards[idx].style.outline = "2px solid #f0883e";
+        cards[idx].style.background = "#1c2128";
+        cards[idx].scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+}
+function updateLineNumbers(errorLines = [], warnLines = [], matchedLines = [], activeLine = -1) {
+    const lines = codeArea.value.split("\n");
+    let html = "";
+    for (let i = 0; i < lines.length; i++) {
+        const line = i + 1;
+        const classes = ["line-number"];
+        if (errorLines.includes(line))       classes.push("error");
+        else if (warnLines.includes(line))   classes.push("warn");
+        if (window.__lastSuggestLines.includes(line)) classes.push("suggest");
+        if (matchedLines.includes(line))     classes.push("matched");
+        else if (line === activeLine)        classes.push("active");
+        html += '<div class="' + classes.join(" ") +
+                '" data-line="' + line + '">' + line + "</div>";
+    }
+    lineNumbers.innerHTML = html;
+    updateSearchLineNumbers();
+}
+lineNumbers.addEventListener("click", e => {
+    const el = e.target.closest(".line-number");
+    if (!el) return;
+    scrollToLine(parseInt(el.dataset.line, 10));
+});
+codeArea.addEventListener("scroll", () => {
+    lineNumbers.scrollTop = codeArea.scrollTop;
+    updateBracketMatching();
+    redrawSearchHighlights();
+});
+codeArea.addEventListener("input", () => {
+    updateLineNumbers(window.__lastErrorLines, window.__lastWarnLines);
+    updateBracketMatching();
+});
+
+function positionFromIndex(text, index) {
+    const before = text.substring(0, index);
+    const lines  = before.split("\n");
+    return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+}
+function getIndexFromPosition(text, line, column) {
+    const lines = text.split("\n");
+    let index = 0;
+    for (let i = 0; i < line - 1; i++) index += lines[i].length + 1;
+    return index + column - 1;
+}
+function addError(list, text, index, message, fix = "", fixCode = "", severity = "error", lang = "general", suggest = null) {
+    const pos = positionFromIndex(text, index);
+    list.push({
+        line: pos.line, column: pos.column,
+        message, fix, fixCode, severity, lang,
+        suggest
+    });
+}
+
+const TAG_REGEX = /<\/?([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?\/?>/g;
+const VOID_TAGS = new Set(["area","base","br","col","embed","hr","img","input",
+    "link","meta","param","source","track","wbr"]);
+
+function tokenizeTags(code) {
+    const tags = [];
+    const re = new RegExp(TAG_REGEX.source, "g");
+    let m;
+    while ((m = re.exec(code)) !== null) {
+        const full = m[0], name = m[1].toLowerCase();
+        if (full.toLowerCase().startsWith("<!doctype")) continue;
+        if (VOID_TAGS.has(name)) continue;
+        if (full.endsWith("/>")) continue;
+        tags.push({ name, index: m.index, end: m.index + full.length, isClose: full.startsWith("</") });
+    }
+    return tags;
+}
+function findTagPair(code, cursorIndex) {
+    const tags = tokenizeTags(code);
+    let activeIdx = -1;
+    for (let i = 0; i < tags.length; i++) {
+        const t = tags[i];
+        if (cursorIndex >= t.index && cursorIndex <= t.end) { activeIdx = i; break; }
+    }
+    if (activeIdx === -1) return null;
+    const active = tags[activeIdx];
+    if (!active.isClose) {
+        let depth = 0;
+        for (let i = activeIdx + 1; i < tags.length; i++) {
+            const t = tags[i];
+            if (t.name === active.name) {
+                if (!t.isClose) depth++;
+                else { if (depth === 0) return { open: active, close: t }; depth--; }
+            }
+        }
+        return { open: active, close: null };
+    } else {
+        let depth = 0;
+        for (let i = activeIdx - 1; i >= 0; i--) {
+            const t = tags[i];
+            if (t.name === active.name) {
+                if (t.isClose) depth++;
+                else { if (depth === 0) return { open: t, close: active }; depth--; }
+            }
+        }
+        return { open: null, close: active };
+    }
+}
+let cachedCharW = 0;
+function measureCharWidth() {
+    if (cachedCharW) return cachedCharW;
+    const span = document.createElement("span");
+    const cs = getComputedStyle(codeArea);
+    span.style.font = cs.font; span.style.fontFamily = cs.fontFamily;
+    span.style.fontSize = cs.fontSize; span.style.visibility = "hidden";
+    span.style.position = "absolute"; span.style.whiteSpace = "pre";
+    span.textContent = "MMMMMMMMMM";
+    document.body.appendChild(span);
+    cachedCharW = span.getBoundingClientRect().width / 10;
+    document.body.removeChild(span);
+    return cachedCharW;
+}
+function padX() { return parseFloat(getComputedStyle(codeArea).paddingLeft); }
+function drawBracketLines(pair) {
+    overlay.innerHTML = "";
+    if (!pair || !pair.open || !pair.close) return;
+    if (!overlay.clientHeight) return;
+    const code = codeArea.value;
+    const openPos  = positionFromIndex(code, pair.open.index);
+    const closePos = positionFromIndex(code, pair.close.index);
+    const lineH = parseFloat(getComputedStyle(codeArea).lineHeight);
+    const padY  = parseFloat(getComputedStyle(codeArea).paddingTop);
+    const sTop  = codeArea.scrollTop;
+    const sLeft = codeArea.scrollLeft;
+    const charW = measureCharWidth();
+    const openX  = (openPos.column  - 1) * charW + padX() - sLeft;
+    const closeX = (closePos.column - 1) * charW + padX() - sLeft;
+    const openY  = (openPos.line  - 1) * lineH + padY + lineH / 2 - sTop;
+    const closeY = (closePos.line - 1) * lineH + padY + lineH / 2 - sTop;
+    const H = overlay.clientHeight;
+    if (closeY < -40 || openY > H + 40) return;
+    const stroke = "#58a6ff", NS = "http://www.w3.org/2000/svg";
+    const startX = Math.max(0, openX - 4);
+    const endX   = Math.max(0, closeX - 4);
+    const path = document.createElementNS(NS, "path");
+    path.setAttribute("d", ["M",startX,openY,"L",startX,closeY,"L",endX,closeY].join(" "));
+    path.setAttribute("fill","none"); path.setAttribute("stroke",stroke);
+    path.setAttribute("stroke-width","1.5"); path.setAttribute("stroke-linecap","round");
+    path.setAttribute("stroke-linejoin","round"); path.setAttribute("opacity","0.9");
+    overlay.appendChild(path);
+    [ [startX,openY], [endX,closeY] ].forEach(([x,y]) => {
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("cx",x); c.setAttribute("cy",y);
+        c.setAttribute("r","3"); c.setAttribute("fill",stroke);
+        overlay.appendChild(c);
+    });
+}
+function updateBracketMatching() {
+    const cursor = codeArea.selectionStart;
+    const code   = codeArea.value;
+    const pair   = findTagPair(code, cursor);
+    const matchedLines = [];
+    if (pair && pair.open && pair.close) {
+        matchedLines.push(
+            positionFromIndex(code, pair.open.index).line,
+            positionFromIndex(code, pair.close.index).line
+        );
+    } else if (pair && (pair.open || pair.close)) {
+        const t = pair.open || pair.close;
+        matchedLines.push(positionFromIndex(code, t.index).line);
+    }
+    const activeLine = positionFromIndex(code, cursor).line;
+    updateLineNumbers(window.__lastErrorLines, window.__lastWarnLines, matchedLines, activeLine);
+    drawBracketLines(pair);
+}
+["click","keyup","input","select"].forEach(e => codeArea.addEventListener(e, updateBracketMatching));
+window.addEventListener("resize", () => { cachedCharW = 0; updateBracketMatching(); redrawSearchHighlights(); });
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "F8") {
+        e.preventDefault();
+        if (e.shiftKey) gotoPrevError();
+        else gotoNextError();
+    }
+});
+</script>
+
+<script>
+/* ===== KAMUS CSS ===== */
+const CSS_PROPS = new Set([
+    "display","position","top","right","bottom","left","float","clear","z-index",
+    "overflow","overflow-x","overflow-y","visibility","opacity","box-sizing",
+    "flex","flex-direction","flex-wrap","flex-flow","justify-content","align-items",
+    "align-content","align-self","order","flex-grow","flex-shrink","flex-basis","gap",
+    "row-gap","column-gap",
+    "grid","grid-template","grid-template-columns","grid-template-rows",
+    "grid-template-areas","grid-area","grid-row","grid-column","grid-gap",
+    "grid-auto-flow","grid-auto-rows","grid-auto-columns",
+    "width","min-width","max-width","height","min-height","max-height",
+    "margin","margin-top","margin-right","margin-bottom","margin-left",
+    "padding","padding-top","padding-right","padding-bottom","padding-left",
+    "border","border-top","border-right","border-bottom","border-left",
+    "border-width","border-style","border-color","border-radius",
+    "border-top-left-radius","border-top-right-radius",
+    "border-bottom-left-radius","border-bottom-right-radius",
+    "border-collapse","border-spacing","border-image",
+    "background","background-color","background-image","background-repeat",
+    "background-position","background-size","background-attachment",
+    "background-clip","background-origin","background-blend-mode",
+    "color","font","font-family","font-size","font-weight","font-style",
+    "font-variant","font-stretch","line-height","letter-spacing","word-spacing",
+    "text-align","text-decoration","text-transform","text-indent","text-shadow",
+    "text-overflow","white-space","word-break","word-wrap","overflow-wrap",
+    "vertical-align","direction","writing-mode",
+    "box-shadow","transition","transition-property",
+    "transition-duration","transition-timing-function","transition-delay",
+    "transform","transform-origin","transform-style","perspective",
+    "perspective-origin","backface-visibility","animation","animation-name",
+    "animation-duration","animation-timing-function","animation-delay",
+    "animation-iteration-count","animation-direction","animation-fill-mode",
+    "animation-play-state","filter","backdrop-filter","mix-blend-mode",
+    "will-change","cursor","pointer-events","user-select","resize",
+    "list-style","list-style-type","list-style-position","list-style-image",
+    "table-layout","caption-side","empty-cells",
+    "content","quotes","counter-reset","counter-increment",
+    "outline","outline-color","outline-style","outline-width","outline-offset",
+    "clip","clip-path","object-fit","object-position","aspect-ratio",
+    "isolation","columns","column-count","column-width","column-rule",
+    "column-span","column-fill","break-before","break-after","break-inside",
+    "scroll-behavior","scroll-snap-type","scroll-snap-align"
+]);
+function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    const dp = Array.from({length: m+1}, (_,i) => [i, ...Array(n).fill(0)]);
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+            dp[i][j] = a[i-1] === b[j-1]
+                ? dp[i-1][j-1]
+                : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    return dp[m][n];
+}
+function findClosest(word, dict, maxDist = 2) {
+    let best = null, bestD = maxDist + 1;
+    for (const w of dict) {
+        const d = levenshtein(word, w);
+        if (d < bestD) { bestD = d; best = w; }
+    }
+    return bestD <= maxDist ? best : null;
+}
+const JS_KEYWORDS = new Set([
+    "var","let","const","function","return","if","else","for","while","do",
+    "switch","case","break","continue","default","try","catch","finally",
+    "throw","new","delete","typeof","instanceof","in","of","this","super",
+    "class","extends","static","get","set","async","await","yield","void",
+    "null","undefined","true","false","NaN","Infinity"
+]);
+const HTML_ATTRS = new Set([
+    "id","class","style","title","lang","dir","hidden","tabindex","accesskey",
+    "contenteditable","draggable","spellcheck","translate","data-",
+    "src","alt","width","height","loading","srcset","sizes","crossorigin",
+    "href","target","rel","download","hreflang","type","media","ping",
+    "action","method","enctype","name","value","placeholder","required",
+    "disabled","readonly","checked","selected","multiple","autocomplete",
+    "autofocus","form","formaction","formmethod","formenctype","formtarget",
+    "formnovalidate","list","min","max","step","pattern","minlength",
+    "maxlength","size","rows","cols","wrap","for","accept","accept-charset",
+    "novalidate","colspan","rowspan","headers","scope","datetime","cite",
+    "open","reversed","start","label","controls","autoplay","loop","muted",
+    "poster","preload","playsinline","kind","srclang","default","charset",
+    "content","http-equiv","property","role","aria-label","aria-hidden",
+    "aria-describedby","aria-labelledby","aria-live","aria-atomic",
+    "aria-busy","aria-current","aria-disabled","aria-expanded","aria-haspopup",
+    "aria-pressed","aria-selected","aria-checked","aria-valuemin",
+    "aria-valuemax","aria-valuenow","aria-valuetext","onclick","onchange",
+    "oninput","onsubmit","onload","onerror","onkeydown","onkeyup",
+    "onkeypress","onmouseover","onmouseout","onmousedown","onmouseup",
+    "onfocus","onblur","onscroll","onresize","ondblclick","oncontextmenu"
+]);
+function validateCSSProperties(cssText, globalCode, blockStart, errors) {
+    const cleaned = cssText.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, " "));
+    const lines = cleaned.split("\n");
+    let offset = 0;
+    for (let li = 0; li < lines.length; li++) {
+        const line = lines[li];
+        const lineIndex = blockStart + offset;
+        const trimmed = line.trim();
+        const noColonMatch = trimmed.match(/^([a-zA-Z-]+)\s+(?!:)([\S].*?)(;?)$/);
+        const hasKnownPropWithoutColon = noColonMatch
+            && CSS_PROPS.has(noColonMatch[1])
+            && !trimmed.includes(":")
+            && !trimmed.endsWith("{")
+            && !trimmed.endsWith("}")
+            && !trimmed.startsWith("/*")
+            && !trimmed.includes("(");
+        if (hasKnownPropWithoutColon) {
+            const prop = noColonMatch[1];
+            const value = noColonMatch[2].replace(/;$/, "").trim();
+            const col = line.indexOf(prop);
+            addError(errors, globalCode, lineIndex + col,
+                "CSS: properti '" + prop + "' tidak memiliki titik dua (:).",
+                "Tambahkan ':' antara nama properti dan nilainya.",
+                prop + ": " + value + ";", "error", "css");
+            offset += line.length + 1;
+            continue;
+        }
+        const emptyValueMatch = trimmed.match(/^([a-zA-Z-]+)\s*:\s*;/);
+        if (emptyValueMatch) {
+            const prop = emptyValueMatch[1];
+            const col = line.indexOf(prop);
+            if (CSS_PROPS.has(prop)) {
+                addError(errors, globalCode, lineIndex + col,
+                    "CSS: properti '" + prop + "' tidak memiliki nilai.",
+                    "Isi nilai setelah ':'. Contoh umum:",
+                    prop + ": initial;", "warn", "css");
+            }
+        }
+        const doubleColonMatch = trimmed.match(/^([a-zA-Z-]+)\s*::\s*(.+?);?$/);
+        if (doubleColonMatch && CSS_PROPS.has(doubleColonMatch[1])) {
+            const prop = doubleColonMatch[1];
+            const value = doubleColonMatch[2].replace(/;$/, "").trim();
+            const col = line.indexOf(prop);
+            addError(errors, globalCode, lineIndex + col,
+                "CSS: properti '" + prop + "' memiliki dua titik dua (::).",
+                "Ganti '::' menjadi ':' untuk deklarasi properti.",
+                prop + ": " + value + ";", "error", "css");
+            offset += line.length + 1;
+            continue;
+        }
+        const propMatch = trimmed.match(/^([a-zA-Z-]+)\s*:/);
+        if (propMatch && !trimmed.endsWith("{") && !trimmed.endsWith("}")) {
+            const prop = propMatch[1];
+            if (!prop.startsWith("--") && !CSS_PROPS.has(prop)) {
+                const suggestion = findClosest(prop, CSS_PROPS, 2);
+                const col = line.indexOf(prop);
+                if (suggestion) {
+                    addError(errors, globalCode, lineIndex + col,
+                        "CSS: properti '" + prop + "' tidak dikenal. Mungkin maksud Anda '" + suggestion + "'?",
+                        "Ganti nama properti typo dengan nama yang benar.",
+                        prop + "  →  " + suggestion, "error", "css");
+                } else {
+                    addError(errors, globalCode, lineIndex + col,
+                        "CSS: properti '" + prop + "' tidak dikenal.",
+                        "Periksa kembali ejaan nama properti CSS.",
+                        "https://developer.mozilla.org/docs/Web/CSS/Reference", "warn", "css");
+                }
+            }
+        }
+        offset += line.length + 1;
+    }
+}
+function validateJSKeywords(jsText, globalCode, blockStart, errors) {
+    const JS_KEYWORDS_TYPO = new Set([
+        "functon","fucntion","functin","funtion","fnction","funciton",
+        "retrun","retun","retrn","reurn",
+        "vra","lte","cnost","cosnt",
+        "wihle","whlie","fro","fo",
+        "swtich","swich","switc",
+        "cacth","ctach","catc","fianlly","finnaly",
+        "thow","trhow",
+        "instaceof","instnaceof","instancof",
+        "imoprt","exprot"
+    ]);
+    const lines = jsText.split("\n");
+    let offset = 0;
+    for (let li = 0; li < lines.length; li++) {
+        const line = lines[li];
+        const lineIndex = blockStart + offset;
+        const codeOnly = line.replace(/\/\/.*$/, "");
+        const wordRegex = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g;
+        let m;
+        while ((m = wordRegex.exec(codeOnly)) !== null) {
+            const word = m[1];
+            if (JS_KEYWORDS_TYPO.has(word)) {
+                const suggestion = findClosest(word, JS_KEYWORDS, 3);
+                const col = m.index;
+                addError(errors, globalCode, lineIndex + col,
+                    "JavaScript: '" + word + "' bukan kata kunci yang valid." +
+                    (suggestion ? " Mungkin maksud Anda '" + suggestion + "'?" : ""),
+                    "Perbaiki ejaan kata kunci.",
+                    word + "  →  " + (suggestion || "?"), "error", "js");
+            }
+        }
+        const keywordMissingParen = codeOnly.match(/\b(if|for|while|switch)\s+[^({\s]/);
+        if (keywordMissingParen) {
+            const col = codeOnly.indexOf(keywordMissingParen[0]);
+            addError(errors, globalCode, lineIndex + col,
+                "JavaScript: '" + keywordMissingParen[1] + "' harus diikuti dengan '('.",
+                "Tambahkan '(' setelah '" + keywordMissingParen[1] + "'.",
+                keywordMissingParen[1] + " (kondisi) { ... }", "error", "js");
+        }
+        const funcNoName = codeOnly.match(/\bfunction\s*\(/);
+        if (funcNoName) {
+            const col = codeOnly.indexOf(funcNoName[0]);
+            addError(errors, globalCode, lineIndex + col,
+                "JavaScript: deklarasi 'function' tidak memiliki nama.",
+                "Tambahkan nama fungsi setelah 'function'.",
+                "function namaFungsi() { ... }", "warn", "js");
+        }
+        offset += line.length + 1;
+    }
+}
+function validateHTMLAttributes(code, errors) {
+    const tagRegex = /<([A-Za-z][A-Za-z0-9:-]*)((?:\s+[^<>]*?)?)\s*\/?>/g;
+    let m;
+    while ((m = tagRegex.exec(code)) !== null) {
+        const tagName = m[1].toLowerCase();
+        const attrStr = m[2];
+        const tagStart = m.index;
+        if (attrStr.trim() === "") continue;
+        if (tagName === "!doctype" || tagName.startsWith("!")) continue;
+        const attrRegex = /([a-zA-Z_:][a-zA-Z0-9_:.-]*)(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g;
+        let am;
+        while ((am = attrRegex.exec(attrStr)) !== null) {
+            const attrName = am[1].toLowerCase();
+            const attrIndex = tagStart + m[0].indexOf(attrStr) + am.index;
+            if (attrName.startsWith("data-") || attrName.startsWith("aria-")) continue;
+            if (!HTML_ATTRS.has(attrName)) {
+                const suggestion = findClosest(attrName, HTML_ATTRS, 2);
+                addError(errors, code, attrIndex,
+                    "HTML: atribut '" + attrName + "' pada <" + tagName + "> tidak dikenal." +
+                    (suggestion ? " Mungkin maksud Anda '" + suggestion + "'?" : ""),
+                    "Periksa ejaan nama atribut." + (suggestion ? " Ganti dengan '" + suggestion + "'." : ""),
+                    suggestion ? (attrName + "  →  " + suggestion) : "(hapus atribut jika tidak perlu)",
+                    "error", "html");
+                continue;
+            }
+            if (am[2] && am[2].trim() === "=") {
+                addError(errors, code, attrIndex,
+                    "HTML: atribut '" + attrName + "' memiliki '=' tanpa nilai.",
+                    "Isi nilai setelah '=', atau hapus tanda '='.",
+                    attrName + "=\"nilai\"", "error", "html");
+            }
+        }
+    }
+}
+function checkBrackets(code, errors, lang = "general") {
+    const stack = [];
+    let state = "normal", quote = "";
+    for (let i = 0; i < code.length; i++) {
+        const c = code[i], n = code[i + 1];
+        if (state === "string") {
+            if (c === "\\" && i + 1 < code.length) { i++; continue; }
+            if (c === quote) { state = "normal"; quote = ""; }
+            continue;
+        }
+        if (state === "template") {
+            if (c === "\\" && i + 1 < code.length) { i++; continue; }
+            if (c === "`") state = "normal";
+            continue;
+        }
+        if (state === "line-comment") { if (c === "\n") state = "normal"; continue; }
+        if (state === "block-comment") { if (c === "*" && n === "/") { state = "normal"; i++; } continue; }
+        if (c === '"' || c === "'") { state = "string"; quote = c; continue; }
+        if (c === "`") { state = "template"; continue; }
+        if (c === "/" && n === "/") { state = "line-comment"; i++; continue; }
+        if (c === "/" && n === "*") { state = "block-comment"; i++; continue; }
+        if (c === "(" || c === "{" || c === "[") { stack.push({ char: c, index: i }); continue; }
+        if (c === ")" || c === "}" || c === "]") {
+            const expected = { ")": "(", "}": "{", "]": "[" }[c];
+            if (stack.length === 0) {
+                addError(errors, code, i,
+                    "Kelebihan penutup '" + c + "' — tidak ada pembuka '" + expected + "'.",
+                    "Hapus karakter '" + c + "', ATAU tambahkan '" + expected + "' di awal blok.",
+                    "Hapus: " + c, "error", lang);
+                continue;
+            }
+            const last = stack[stack.length - 1];
+            if (last.char !== expected) {
+                const closeOfLast = { "(": ")", "{": "}", "[": "]" }[last.char];
+                const lastPos = positionFromIndex(code, last.index);
+                addError(errors, code, i,
+                    "Kurung tidak cocok: '" + c + "' tetapi pembuka terakhir '" +
+                    last.char + "' (baris " + lastPos.line + ").",
+                    "Ubah '" + c + "' menjadi '" + closeOfLast + "', atau tutup '" +
+                    last.char + "' dengan '" + closeOfLast + "'.",
+                    "Ganti: " + c + "  →  " + closeOfLast, "error", lang);
+            } else stack.pop();
+        }
+    }
+    for (let i = stack.length - 1; i >= 0; i--) {
+        const item = stack[i];
+        const close = { "(": ")", "{": "}", "[": "]" }[item.char];
+        const pos = positionFromIndex(code, item.index);
+        const analysis = analyzeUnclosedBracket(code, item.index, item.char);
+        const suggestInfo = {
+            line: analysis.suggestLine,
+            closeChar: close,
+            indent: analysis.openIndent,
+            beforeLine: analysis.beforeLine,
+            afterLine: analysis.afterLine,
+            openLine: pos.line
+        };
+        const mainMsg = "Kurung '" + item.char + "' belum ditutup (dibuka baris " +
+            pos.line + " kolom " + pos.column + ").";
+        const suggestMsg = "Letakkan '" + close + "' di baris " +
+            analysis.suggestLine + " (setelah statement terakhir dalam blok).";
+        addError(errors, code, item.index,
+            mainMsg, suggestMsg,
+            (analysis.openIndent || "") + close,
+            "error", lang, suggestInfo);
+    }
+    if (state === "string") {
+        addError(errors, code, code.length - 1,
+            "Tanda kutip " + quote + " belum ditutup.",
+            "Tambahkan '" + quote + "' di akhir string.", quote, "error", lang);
+    }
+}
+function checkHTMLComments(code, errors) {
+    let start = 0;
+    while (true) {
+        const open = code.indexOf("<!--", start);
+        if (open === -1) break;
+        const close = code.indexOf("-->", open + 4);
+        if (close === -1) {
+            addError(errors, code, open, "Komentar HTML <!-- belum ditutup.",
+                "Tambahkan '-->' di akhir komentar.", "<!-- komentar -->", "error", "html");
+            break;
+        }
+        start = close + 3;
+    }
+}
+function checkHTMLTags(code, errors) {
+    const regex = /<\/?([A-Za-z][A-Za-z0-9:-]*)(?:\s[^<>]*?)?\/?>/g;
+    const stack = [];
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+        const full = match[0];
+        const name = match[1].toLowerCase();
+        const index = match.index;
+        if (full.toLowerCase().startsWith("<!doctype")) continue;
+        if (full.endsWith("/>")) continue;
+        if (VOID_TAGS.has(name)) continue;
+        if (full.startsWith("</")) {
+            if (stack.length === 0) {
+                addError(errors, code, index,
+                    "Tag penutup </" + name + "> tidak memiliki tag pembuka.",
+                    "Hapus </" + name + ">, ATAU tambahkan <" + name + "> sebelum baris ini.",
+                    "Hapus: </" + name + ">", "error", "html");
+                continue;
+            }
+            const last = stack[stack.length - 1];
+            if (last.name !== name) {
+                const lastPos = positionFromIndex(code, last.index);
+                addError(errors, code, index,
+                    "Tag </" + name + "> tidak cocok. Tag <" + last.name +
+                    "> (baris " + lastPos.line + ") masih terbuka.",
+                    "Tutup <" + last.name + "> dulu, baru </" + name + ">.",
+                    "Urutan benar:\n  <" + last.name + "> ... </" + last.name + ">\n  <" +
+                    name + "> ... </" + name + ">", "error", "html");
+            } else stack.pop();
+            continue;
+        }
+        stack.push({ name, index });
+    }
+    for (let i = stack.length - 1; i >= 0; i--) {
+        const item = stack[i];
+        const pos = positionFromIndex(code, item.index);
+        let priority = "";
+        if (item.name === "html")   priority = " ⚠️ WAJIB!";
+        if (item.name === "body")   priority = " ⚠️ WAJIB!";
+        if (item.name === "head")   priority = " ⚠️ WAJIB!";
+        if (item.name === "script") priority = " ⚠️ Script tidak jalan.";
+        if (item.name === "style")  priority = " ⚠️ Style tidak diterapkan.";
+        addError(errors, code, item.index,
+            "Tag <" + item.name + "> belum ditutup." + priority,
+            "Tambahkan </" + item.name + "> (dibuka baris " + pos.line + " kolom " + pos.column + ").",
+            "</" + item.name + ">", "error", "html");
+    }
+}
+function checkHTMLStructure(code, errors) {
+    if (!/<!doctype\s+html/i.test(code))
+        addError(errors, code, 0, "Dokumen tidak memiliki <!DOCTYPE html>.",
+            "Tambahkan di baris paling atas.", "<!DOCTYPE html>", "error", "html");
+    if (!/<html[\s>]/i.test(code))
+        addError(errors, code, 0, "Dokumen tidak memiliki tag <html>.",
+            "Bungkus dokumen dengan <html> ... </html>.", "<html>...</html>", "error", "html");
+    if (!/<head[\s>]/i.test(code))
+        addError(errors, code, 0, "Dokumen tidak memiliki tag <head>.",
+            "Tambahkan <head> ... </head>.", "<head>...</head>", "error", "html");
+    if (!/<body[\s>]/i.test(code))
+        addError(errors, code, 0, "Dokumen tidak memiliki tag <body>.",
+            "Tambahkan <body> ... </body>.", "<body>...</body>", "error", "html");
+}
+function extractBlocks(code, tag) {
+    const result = [];
+    const regex = new RegExp("<" + tag + "\\b[^>]*>([\\s\\S]*?)<\\/" + tag + "\\s*>", "gi");
+    let match;
+    while ((match = regex.exec(code)) !== null) {
+        const content = match[1];
+        const start = match.index + match[0].indexOf(">") + 1;
+        result.push({ code: content, start });
+    }
+    return result;
+}
+function checkJavaScript(code, errors) {
+    extractBlocks(code, "script").forEach(block => {
+        const local = [];
+        checkBrackets(block.code, local, "js");
+        local.forEach(error => {
+            const index = block.start + getIndexFromPosition(block.code, error.line, error.column);
+            let adjustedSuggest = error.suggest;
+            if (adjustedSuggest) {
+                const blockStartPos = positionFromIndex(code, block.start);
+                adjustedSuggest = Object.assign({}, adjustedSuggest, {
+                    line: adjustedSuggest.line + (blockStartPos.line - 1)
+                });
+            }
+            addError(errors, code, index,
+                "JavaScript: " + error.message.replace(/^JavaScript: /, ""),
+                error.fix, error.fixCode, error.severity || "error", "js",
+                adjustedSuggest);
+        });
+        validateJSKeywords(block.code, code, block.start, errors);
+    });
+}
+function checkCSS(code, errors) {
+    extractBlocks(code, "style").forEach(block => {
+        const local = [];
+        checkBrackets(block.code, local, "css");
+        local.forEach(error => {
+            const index = block.start + getIndexFromPosition(block.code, error.line, error.column);
+            let adjustedSuggest = error.suggest;
+            if (adjustedSuggest) {
+                const blockStartPos = positionFromIndex(code, block.start);
+                adjustedSuggest = Object.assign({}, adjustedSuggest, {
+                    line: adjustedSuggest.line + (blockStartPos.line - 1)
+                });
+            }
+            addError(errors, code, index,
+                "CSS: " + error.message.replace(/^CSS: /, ""),
+                error.fix, error.fixCode, error.severity || "error", "css",
+                adjustedSuggest);
+        });
+        validateCSSProperties(block.code, code, block.start, errors);
+    });
+}
+
+function renderErrors() {
+    const errors = document.getElementById("errors");
+    const status = document.getElementById("status");
+    errors.innerHTML = "";
+    let list = window.__allErrors.slice();
+    if (window.__activeFilter !== "all") {
+        list = list.filter(e => e.lang === window.__activeFilter);
+    }
+    if (list.length === 0) {
+        if (window.__allErrors.length === 0) {
+            status.className = "success";
+            status.innerHTML = "✅ Tidak ditemukan kesalahan sintaks.";
+        } else {
+            status.className = "warn-status";
+            status.innerHTML = "ℹ️ Tidak ada error pada filter '" +
+                window.__activeFilter.toUpperCase() + "'.";
+        }
+        return;
+    }
+    const nErr  = list.filter(e => e.severity === "error").length;
+    const nWarn = list.length - nErr;
+    status.className = nErr > 0 ? "error-status" : "warn-status";
+    status.innerHTML = "❌ " + nErr + " error" +
+        (nWarn > 0 ? " · ⚠️ " + nWarn + " peringatan" : "") +
+        " — klik <b>🎯 Ke Baris</b> untuk ke baris error, <b>📍 Ke Baris Saran</b> untuk lihat tempat tutup.";
+    list.forEach((error, idx) => {
+        const div = document.createElement("div");
+        div.className = "error-item" + (error.severity === "warn" ? " warn" : "");
+        div.dataset.errorIdx = idx;
+        const icon = error.severity === "warn" ? "⚠️" : "🔴";
+        let html =
+            '<div class="error-title">' + icon + ' #' + (idx + 1) + ' — ' +
+            escapeHTML(error.message) + '</div>' +
+            '<div class="error-location">📍 Baris ' + error.line +
+            ', kolom ' + error.column +
+            ' · <span style="color:#58a6ff">' + error.lang.toUpperCase() + '</span></div>';
+        if (error.suggest) {
+            const s = error.suggest;
+            html += '<div class="error-suggest">' +
+                '<span class="error-suggest-label">📍 Saran tempat menaruh penutup:</span>' +
+                'Letakkan <b>' + escapeHTML(s.closeChar) + '</b> di <b>baris ' + s.line + '</b>';
+            if (s.beforeLine !== undefined && s.beforeLine !== null) {
+                html += '<div class="suggest-line">' +
+                    '<span class="line-tag">' + (s.line - 1) + '</span>' +
+                    escapeHTML(s.beforeLine) +
+                    '</div>';
+            }
+            html += '<div class="suggest-line">' +
+                '<span class="line-tag">' + s.line + '</span>' +
+                '<span class="new-content">' + escapeHTML((s.indent || "") + s.closeChar) + '</span>' +
+                '<span class="arrow">← tambahkan di sini</span>' +
+                '</div>';
+            if (s.afterLine) {
+                html += '<div class="suggest-line">' +
+                    '<span class="line-tag">' + (s.line + 1) + '</span>' +
+                    escapeHTML(s.afterLine) +
+                    '</div>';
+            }
+            html += '</div>';
+        }
+        if (error.fix) {
+            html += '<div class="error-fix">' +
+                    '<span class="error-fix-label">💡 Perbaikan:</span>' +
+                    escapeHTML(error.fix);
+            if (error.fixCode)
+                html += '<code>' + escapeHTML(error.fixCode) + '</code>';
+            html += '</div>';
+        }
+        html += '<div class="error-actions">' +
+                '<button class="btn-goto" data-goto="' + error.line + '" type="button">' +
+                '<span>🎯</span> Ke Baris ' + error.line +
+                '</button>';
+        if (error.suggest) {
+            html += '<button class="btn-goto btn-goto-suggest" data-goto-suggest="' +
+                error.suggest.line + '" data-close="' + escapeHTML(error.suggest.closeChar) +
+                '" data-indent="' + escapeHTML(error.suggest.indent || "") +
+                '" type="button">' +
+                '<span>📍</span> Ke Baris Saran (' + error.suggest.line + ')' +
+                '</button>';
+        }
+        html += '</div>';
+        div.innerHTML = html;
+        div.querySelector(".btn-goto").addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            scrollToLine(error.line, true);
+            window.__currentErrorIndex = window.__allErrors.indexOf(error);
+            updateNavInfo();
+        });
+        const btnSuggest = div.querySelector(".btn-goto-suggest");
+        if (btnSuggest) {
+            btnSuggest.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                scrollToSuggestLine(
+                    parseInt(btnSuggest.dataset.gotoSuggest, 10),
+                    btnSuggest.dataset.close,
+                    btnSuggest.dataset.indent
+                );
+            });
+        }
+        div.addEventListener("click", (ev) => {
+            if (ev.target.closest(".btn-goto")) return;
+            scrollToLine(error.line, true);
+            window.__currentErrorIndex = window.__allErrors.indexOf(error);
+            updateNavInfo();
+        });
+        errors.appendChild(div);
+    });
+    window.__currentErrorIndex = -1;
+    updateNavInfo();
+}
+document.querySelectorAll(".pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+        document.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+        window.__activeFilter = pill.dataset.filter;
+        renderErrors();
+    });
+});
+function checkAll() {
+    const code = codeArea.value;
+    const found = [];
+    checkHTMLComments(code, found);
+    checkHTMLStructure(code, found);
+    checkHTMLTags(code, found);
+    checkJavaScript(code, found);
+    checkCSS(code, found);
+    validateHTMLAttributes(code, found);
+    const unique = [];
+    const seen = new Set();
+    found.forEach(e => {
+        const key = e.line + "|" + e.column + "|" + e.message;
+        if (!seen.has(key)) { seen.add(key); unique.push(e); }
+    });
+    unique.sort((a, b) => a.line - b.line || a.column - b.column);
+    window.__allErrors = unique;
+    window.__lastErrorLines = unique.filter(e => e.severity !== "warn").map(e => e.line);
+    window.__lastWarnLines  = unique.filter(e => e.severity === "warn").map(e => e.line);
+    window.__lastSuggestLines = unique
+        .filter(e => e.suggest && e.suggest.line)
+        .map(e => e.suggest.line);
+    const badge = document.getElementById("errCountBadge");
+    const nErr = unique.filter(e => e.severity !== "warn").length;
+    if (nErr > 0) {
+        badge.textContent = nErr;
+        badge.classList.add("show");
+    } else {
+        badge.classList.remove("show");
+    }
+    updateLineNumbers(window.__lastErrorLines, window.__lastWarnLines);
+    updateBracketMatching();
+    renderErrors();
+}
+function escapeHTML(text) {
+    return String(text)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function formatHTML() {
+    let code = codeArea.value.replace(/>\s*</g, ">\n<").replace(/\n\s*\n/g, "\n");
+    const lines = code.split("\n");
+    let indent = 0; const output = [];
+    lines.forEach(line => {
+        const clean = line.trim();
+        if (!clean) return;
+        if (/^<\//.test(clean)) indent = Math.max(0, indent - 1);
+        output.push("    ".repeat(indent) + clean);
+        if (/^<[A-Za-z]/.test(clean) && !/^<\//.test(clean) && !/\/>$/.test(clean) &&
+            !/^<(meta|link|img|input|br|hr|source|area|base|embed|param|track|wbr)\b/i.test(clean))
+            indent++;
+    });
+    codeArea.value = output.join("\n");
+    updateLineNumbers();
+    updateBracketMatching();
+}
+function clearCode() {
+    if (codeArea.value.trim() && !confirm("Yakin hapus semua kode?")) return;
+    codeArea.value = "";
+    document.getElementById("errors").innerHTML = "";
+    document.getElementById("preview").srcdoc = "";
+    document.getElementById("previewStatus").textContent = "kosong";
+    document.getElementById("previewStatus").classList.remove("live", "dirty");
+    lastRenderedCode = null;
+    overlay.innerHTML = "";
+    searchOverlay.innerHTML = "";
+    lineSuggest.classList.remove("show");
+    const status = document.getElementById("status");
+    status.className = ""; status.innerHTML = "Belum diperiksa.";
+    window.__lastErrorLines = []; window.__lastWarnLines = [];
+    window.__allErrors = []; window.__lastSuggestLines = [];
+    document.getElementById("errCountBadge").classList.remove("show");
+    document.getElementById("navInfo").textContent = "";
+    clearSearch();
+    updateLineNumbers();
+}
+history.pushState({ page: "editor" }, "", location.href);
+window.addEventListener("popstate", () => {
+    if (document.body.classList.contains("preview-mode")) {
+        exitPreviewMode();
+        document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === "code"));
+        document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-code"));
+        history.pushState({ page: "editor" }, "", location.href);
+    }
+});
+
+/* =====================================================
+   SLIDER UKURAN TEKS KODE
+===================================================== */
+const fontSlider = document.getElementById("fontSlider");
+const sizeValue  = document.getElementById("sizeValue");
+const rootStyle  = document.documentElement;
+
+function setCodeFontSize(px) {
+    px = Math.max(8, Math.min(24, parseInt(px, 10) || 11));
+
+    // line-height proporsional: 1.65x dari font-size (dibulatkan)
+    const lineHeight = Math.round(px * 1.65);
+    rootStyle.style.setProperty("--code-font-size", px + "px");
+    rootStyle.style.setProperty("--code-line-height", lineHeight + "px");
+
+    // Update tampilan nilai
+    fontSlider.value = px;
+    sizeValue.textContent = px + "px";
+
+    // Update preset active state
+    document.querySelectorAll(".size-preset").forEach(p => {
+        p.classList.toggle("active", parseInt(p.dataset.size, 10) === px);
+    });
+
+    // Reset cache lebar karakter (karena font berubah)
+    cachedCharW = 0;
+
+    // Re-render nomor baris, bracket overlay, dan search highlight
+    requestAnimationFrame(() => {
+        updateLineNumbers(window.__lastErrorLines, window.__lastWarnLines);
+        updateBracketMatching();
+        if (window.__searchQuery) redrawSearchHighlights();
+        lineSuggest.classList.remove("show");
+    });
+
+    // Simpan preferensi
+    try { localStorage.setItem("codeFontSize", px); } catch (e) {}
+}
+
+// Event listener slider
+fontSlider.addEventListener("input", (e) => {
+    setCodeFontSize(e.target.value);
+});
+
+// Preset buttons
+document.querySelectorAll(".size-preset").forEach(preset => {
+    preset.addEventListener("click", () => {
+        setCodeFontSize(preset.dataset.size);
+    });
+});
+
+// Restore preferensi terakhir
+(function restoreFontSize() {
+    let saved = 11;
+    try {
+        const v = localStorage.getItem("codeFontSize");
+        if (v) saved = parseInt(v, 10);
+    } catch (e) {}
+    setCodeFontSize(saved);
+})();
+
+updateLineNumbers();
+setTimeout(updateBracketMatching, 50);
+</script>
+</body>
+</html>
