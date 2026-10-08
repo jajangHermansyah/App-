@@ -1,169 +1,329 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-   <meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-      
-    <title>tekstur Seamless</title>
+    <title>Tekstur Seamless</title>
     <style>
-        body {
+        * { box-sizing: border-box; }
+
+        html, body {
             margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
             background-color: #121212;
             color: white;
             font-family: sans-serif;
+        }
+
+        body {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
+            height: 100dvh;
         }
 
-        .container {
-            flex: 1;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: auto;
-            padding: 20px;
-        }
-
-        /* Canvas untuk merender gambar */
-        canvas {
-            max-width: 90vw;
-            max-height: 70vh;
-            border: 2px solid #444;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            background-color: #222;
-        }
-
-        .controls {
+        /* === PANEL ATAS === */
+        .top-panel {
             background: #222;
             width: 100%;
-            padding: 20px;
-            box-sizing: border-box;
-            border-top: 2px solid #333;
-            text-align: center;
+            padding: 6px 10px;          /* ⬅️ panel padding */
+            border-bottom: 2px solid #333;
+            flex-shrink: 0;
         }
 
-        .btn {
-            display: inline-block;
-            padding: 12px 20px;
-            border-radius: 8px;
+        /* Baris-baris dalam panel */
+        .row,
+        .row-settings,
+        .row-format {
+            display: flex;
+            gap: 5px;                   /* ⬅️ jarak antar elemen */
+            margin-bottom: 4px;         /* ⬅️ jarak antar baris */
+            align-items: stretch;
+        }
+
+        /* Baris slider kualitas */
+        .row-quality {
+            display: none;
+            gap: 8px;
+            margin-bottom: 4px;
+            align-items: center;
+            background: #2c2c2c;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #bbb;
+        }
+
+        .row-quality.active {
+            display: flex;
+        }
+
+        .row-quality input[type="range"] {
+            flex: 1;
+            accent-color: #28a745;
+            min-width: 0;
+        }
+
+        .quality-value {
+            min-width: 36px;
+            text-align: right;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        /* === Elemen seragam === */
+        .btn, .field, .radio-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            min-width: 0;
+            padding: 6px 4px;           /* ⬅️ padding tombol */
+            height: 36px;               /* ⬅️ TINGGI TOMBOL */
+            border-radius: 7px;
+            border: none;
+            font-size: 12px;            /* ⬅️ font tombol */
             font-weight: bold;
             cursor: pointer;
-            margin: 5px;
-            border: none;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .btn-upload { background: #007bff; color: white; }
-        .btn-save { background: #28a745; color: white; display: none; }
+        .btn-save { background: #28a745; color: white; }
 
-        .settings {
-            margin-top: 15px;
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            font-size: 14px;
+        /* Field dengan label */
+        .field {
+            background: #2c2c2c;
+            color: #ddd;
+            gap: 6px;
+            padding: 0 8px;
+            font-weight: normal;
         }
 
-        input[type="number"] {
-            width: 50px;
-            padding: 5px;
+        .field span {
+            font-size: 11px;
+            color: #aaa;
+            flex-shrink: 0;
+        }
+
+        .field input[type="number"] {
+            width: 100%;
+            min-width: 0;
+            padding: 4px;
             border-radius: 4px;
             border: none;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            background: #1a1a1a;
+            color: white;
+        }
+
+        /* Radio pill PNG / JPG */
+        .radio-pill {
+            background: #2c2c2c;
+            color: #bbb;
+            transition: background 0.2s, color 0.2s;
+            position: relative;
+            padding: 0;
+        }
+
+        .radio-pill input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .radio-pill:has(input:checked) {
+            background: #007bff;
+            color: white;
+        }
+
+        .row-format .format-label {
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            height: 36px;
+            font-size: 11px;
+            color: #888;
+            flex-shrink: 0;
+        }
+
+        /* === AREA CANVAS === */
+        .container {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 2px solid #444;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background-color: #222;
         }
     </style>
 </head>
 <body>
 
+    <!-- PANEL ATAS -->
+    <div class="top-panel">
+
+        <!-- Baris 1: Pilih Gambar + Simpan -->
+        <div class="row">
+            <label for="imageInput" class="btn btn-upload">📁 PILIH GAMBAR</label>
+            <input type="file" id="imageInput" accept="image/*" style="display:none">
+            <button id="saveBtn" class="btn btn-save" style="display:none;">💾 SIMPAN</button>
+        </div>
+
+        <!-- Baris 2: Kolom + Baris -->
+        <div class="row-settings">
+            <label class="field">
+                <span>Kolom</span>
+                <input type="number" id="cols" value="2" min="1">
+            </label>
+            <label class="field">
+                <span>Baris</span>
+                <input type="number" id="rows" value="2" min="1">
+            </label>
+        </div>
+
+        <!-- Baris 3: Format PNG / JPG -->
+        <div class="row-format">
+            <div class="format-label">Format:</div>
+            <label class="radio-pill">
+                <input type="radio" name="format" value="png" checked>
+                PNG
+            </label>
+            <label class="radio-pill">
+                <input type="radio" name="format" value="jpeg">
+                JPG
+            </label>
+        </div>
+
+        <!-- Baris 4: Slider Kualitas (khusus JPG) -->
+        <div class="row-quality" id="qualityGroup">
+            <span>Kualitas</span>
+            <input type="range" id="quality" min="10" max="100" value="90" step="5">
+            <span class="quality-value" id="qualityValue">90%</span>
+        </div>
+
+    </div>
+
+    <!-- AREA CANVAS -->
     <div class="container">
         <canvas id="mainCanvas"></canvas>
     </div>
 
-    <div class="controls">
-        <label for="imageInput" class="btn btn-upload">📁 PILIH GAMBAR</label>
-        <input type="file" id="imageInput" accept="image/*" style="display:none">
-        
-        <button id="saveBtn" class="btn btn-save">💾 SIMPAN HASIL (.PNG)</button>
-
-        <div class="settings">
-            <div>
-                Kolom: <input type="number" id="cols" value="2" min="1">
-            </div>
-            <div>
-                Baris: <input type="number" id="rows" value="2" min="1">
-            </div>
-        </div>
-        <p style="font-size: 11px; color: #888; margin-top: 10px;">
-            Atur jumlah kolom/baris untuk menentukan seberapa luas pengulangan gambar.
-        </p>
-    </div>
-
     <script>
-        const imageInput = document.getElementById('imageInput');
-        const saveBtn = document.getElementById('saveBtn');
-        const canvas = document.getElementById('mainCanvas');
-        const ctx = canvas.getContext('2d');
-        const colInput = document.getElementById('cols');
-        const rowInput = document.getElementById('rows');
+        const imageInput   = document.getElementById('imageInput');
+        const saveBtn      = document.getElementById('saveBtn');
+        const canvas       = document.getElementById('mainCanvas');
+        const ctx          = canvas.getContext('2d');
+        const colInput     = document.getElementById('cols');
+        const rowInput     = document.getElementById('rows');
+        const qualityGroup = document.getElementById('qualityGroup');
+        const qualityInput = document.getElementById('quality');
+        const qualityValue = document.getElementById('qualityValue');
+        const formatRadios = document.querySelectorAll('input[name="format"]');
 
         let activeImage = null;
 
+        // === Upload Gambar ===
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    activeImage = new Image();
-                    activeImage.onload = renderTexture;
-                    activeImage.src = event.target.result;
-                }
-                reader.readAsDataURL(file);
-            }
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                activeImage = new Image();
+                activeImage.onload = renderTexture;
+                activeImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
         });
 
+        // === Render Tekstur ===
         function renderTexture() {
             if (!activeImage) return;
 
-            const cols = parseInt(colInput.value) || 1;
-            const rows = parseInt(rowInput.value) || 1;
+            const cols = Math.max(1, parseInt(colInput.value) || 1);
+            const rows = Math.max(1, parseInt(rowInput.value) || 1);
 
-            // Set ukuran canvas sesuai (Ukuran Gambar x Jumlah Pengulangan)
-            canvas.width = activeImage.width * cols;
+            canvas.width  = activeImage.width  * cols;
             canvas.height = activeImage.height * rows;
 
-            // Loop untuk menggambar pola tile
+            const currentFormat = document.querySelector('input[name="format"]:checked').value;
+            if (currentFormat === 'jpeg') {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+
             for (let i = 0; i < rows; i++) {
                 for (let j = 0; j < cols; j++) {
-                    ctx.drawImage(activeImage, j * activeImage.width, i * activeImage.height);
+                    ctx.drawImage(
+                        activeImage,
+                        j * activeImage.width,
+                        i * activeImage.height
+                    );
                 }
             }
 
-            saveBtn.style.display = 'inline-block';
+            saveBtn.style.display = 'inline-flex';
         }
 
-        // Update otomatis saat angka kolom/baris diubah
         [colInput, rowInput].forEach(input => {
             input.addEventListener('input', renderTexture);
         });
 
-        // Fungsi Simpan Gambar
+        // === Toggle slider kualitas ===
+        formatRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'jpeg') {
+                    qualityGroup.classList.add('active');
+                } else {
+                    qualityGroup.classList.remove('active');
+                }
+                renderTexture();
+            });
+        });
+
+        qualityInput.addEventListener('input', function() {
+            qualityValue.textContent = this.value + '%';
+        });
+
+        // === Simpan Gambar ===
         saveBtn.addEventListener('click', function() {
+            const format = document.querySelector('input[name="format"]:checked').value;
+            const quality = parseInt(qualityInput.value) / 100;
+
+            let dataURL, extension;
+            if (format === 'jpeg') {
+                dataURL = canvas.toDataURL('image/jpeg', quality);
+                extension = 'jpg';
+            } else {
+                dataURL = canvas.toDataURL('image/png');
+                extension = 'png';
+            }
+
             const link = document.createElement('a');
-            link.download = 'seamless-texture-result.png';
-            link.href = canvas.toDataURL('image/png');
+            link.download = `seamless-texture-result.${extension}`;
+            link.href = dataURL;
             link.click();
         });
     </script>
-   <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js')
-  .then(function(reg){
-    console.log("Service Worker aktif", reg);
-  }).catch(function(err){
-    console.log("Service Worker gagal", err);
-  });
-        }
-   </script>
 </body>
 </html>
