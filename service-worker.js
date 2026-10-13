@@ -1,4 +1,4 @@
-const CACHE_NAME = "App+-v7.9";
+const CACHE_NAME = "App+-v8.0";
 
 const urlsToCache = [
   "./",
