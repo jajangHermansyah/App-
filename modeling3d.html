@@ -2945,7 +2945,7 @@ _updateScale(clientX, clientY, ds) {
     const projected = dragVec.dot(axisDirScreen);
 
     // Konversi jarak (px) → faktor skala
-    const sensitivity = 0.005;
+    const sensitivity = 0.010;
     let factor = Math.exp(projected * sensitivity);
     factor = Math.max(0.02, Math.min(50, factor));
 
