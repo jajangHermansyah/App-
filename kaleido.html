@@ -14,7 +14,7 @@
     #controls {
       flex: 0 0 auto; background: #e0e0e0; padding: 6px;
       display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center;
-      border-bottom: 2px solid #333; touch-action: manipulation;
+      border-bottom: 2px solid #333; touch-action: manipulation; z-index: 10;
     }
     .ctrl-group {
       display: flex; align-items: center; background: #fff;
@@ -36,551 +36,795 @@
       cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 4px;
     }
     .btn-group button:active { background: #ccc; }
+    .btn-group button.active { background: #ffcccc; border-color: #d26969; }
+    
     #canvas-wrapper {
       flex: 1 1 auto; position: relative; overflow: hidden;
-      background-color: #333;
+      background-color: #333; display: flex; justify-content: center; align-items: center;
     }
-
     canvas {
-      display: block; touch-action: none; background-color: #ffffff;
-      position: absolute;
-      transform-origin: 0 0;
-      will-change: transform;
+      position: absolute; touch-action: none;
+      transform-origin: 0 0; will-change: transform;
     }
+    #bgCanvas { z-index: 0; background-color: #ffffff; }
+    #sceneCanvas   { z-index: 1; background-color: transparent; }
+    #previewCanvas { z-index: 2; background-color: transparent; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
 <div id="app-container">
   <div id="controls">
-    <div class="ctrl-group" title="Warna"><span>🎨</span><input type="color" id="colorPicker" value="#000000"></div>
-    <div class="ctrl-group" title="Ketebalan"><span>🖌️</span><input type="number" id="lineWidth" min="1" max="50" value="2"></div>
-    <div class="ctrl-group" title="Tipe Kuas"><span>✏️</span><select id="brushType"><option value="normal">Normal</option><option value="glow">Glow</option></select></div>
-    <div class="ctrl-group" title="Alat Gambar"><span>📐</span><select id="toolType"><option value="free">Bebas</option><option value="line">Garis</option><option value="circle">Lingkaran</option><option value="triangle">Segitiga</option><option value="rectangle">Persegi P.</option><option value="square">Persegi</option><option value="ellipse">Elips</option><option value="star">Bintang</option><option value="heart">Hati</option><option value="trapezoid">Trapesium</option></select></div>
-    <div class="ctrl-group" title="Isi Warna"><span>🍩</span><input type="checkbox" id="fillShape"></div>
-    <div class="ctrl-group" title="Jumlah Pantulan"><span>🔁</span><input type="number" id="segmentsInput" min="1" value="12"></div>
-    <div class="ctrl-group" title="Gaya Pantulan"><span>💠</span><select id="reflectionStyle"><option value="both">Rotasi+Cermin</option><option value="rotate">Rotasi</option><option value="mirror">Cermin</option><option value="none">Tanpa</option></select></div>
+    <div class="ctrl-group" title="Warna"><span>🎨</span><input type="color" id="color" value="#000000"></div>
+    <div class="ctrl-group" title="Ketebalan"><span>🖌️</span><input type="number" id="width" min="1" max="50" value="4"></div>
+    <div class="ctrl-group" title="Tipe Kuas"><span>✏️</span><select id="brush"><option value="normal">Normal</option><option value="glow">Glow</option></select></div>
 
-    <div class="ctrl-group" title="Mode Input">
-      <span>🖱️</span>
-      <select id="inputMode">
-        <option value="touch">Sentuh</option>
-        <option value="mouse">Mouse</option>
+    <div class="ctrl-group" title="Alat Gambar">
+      <span>📐</span>
+      <select id="tool">
+        <option value="freehand">Bebas</option>
+        <option value="line">Garis</option>
+        <option value="circle">Lingkaran</option>
+        <option value="triangle">Segitiga</option>
+        <option value="rectangle">Persegi P.</option>
+        <option value="square">Persegi</option>
+        <option value="ellipse">Elips</option>
+        <option value="star">Bintang</option>
+        <option value="heart">Hati</option>
+        <option value="trapezoid">Trapesium</option>
+      </select>
+    </div>
+
+    <div class="ctrl-group" title="Isi Warna"><span>🍩</span><input type="checkbox" id="fill"></div>
+    <div class="ctrl-group" title="Jumlah Pantulan"><span>🔁</span><input type="number" id="segments" min="2" max="48" value="12"></div>
+    <div class="ctrl-group" title="Gaya Pantulan">
+      <span>💠</span>
+      <select id="reflection">
+        <option value="both">Rotasi+Cermin</option>
+        <option value="rotate">Rotasi</option>
+        <option value="mirror">Cermin</option>
+        <option value="none">Tanpa</option>
       </select>
     </div>
 
     <div class="ctrl-group" title="Tampilkan Garis Panduan"><span>👁️</span><input type="checkbox" id="showGuides" checked></div>
+
     <div class="btn-group">
-      <button id="eraser">🧹</button><button id="undo">↩️</button><button id="redo">↪️</button>
-      <button id="reset">🗑️</button><button id="resetZoom">🔄</button><button id="save">💾</button>
+      <button id="eraserBtn" title="Penghapus">🧹</button>
+      <button id="undoBtn" disabled>↩️</button>
+      <button id="redoBtn" disabled>↪️</button>
+      <button id="clearBtn">🗑️</button>
+      <button id="resetZoomBtn" title="Reset Zoom">🔄</button>
+      <button id="saveBtn">💾</button>
+      <button id="importBtn">🖼️</button>
+      <button id="clearTextureBtn">🚫</button>
+      <input type="file" id="textureFile" accept="image/*" class="hidden">
     </div>
   </div>
 
   <div id="canvas-wrapper">
-    <canvas id="canvas" width="980" height="980"></canvas>
+    <canvas id="bgCanvas" width="980" height="980"></canvas>
+    <canvas id="sceneCanvas" width="980" height="980"></canvas>
+    <canvas id="previewCanvas" width="980" height="980"></canvas>
   </div>
 </div>
 
 <script>
-const CANVAS_W = 980;
-const CANVAS_H = 980;
+"use strict";
 
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext("2d");
-canvas.width = CANVAS_W;
-canvas.height = CANVAS_H;
+/* ================= SETUP CANVAS ================= */
+const W = 980, H = 980, CX = W/2, CY = H/2;
 
+const bgCanvas = document.getElementById("bgCanvas");
+const bgCtx = bgCanvas.getContext("2d");
+
+const sceneCanvas = document.getElementById("sceneCanvas");
+const sceneCtx = sceneCanvas.getContext("2d", { alpha: true });
+
+const previewCanvas = document.getElementById("previewCanvas");
+const previewCtx = previewCanvas.getContext("2d");
+
+const snapshotCanvas = document.createElement("canvas");
+snapshotCanvas.width = W; snapshotCanvas.height = H;
+const snapshotCtx = snapshotCanvas.getContext("2d");
+
+const eraserPreviewCanvas = document.createElement("canvas");
+eraserPreviewCanvas.width = W; eraserPreviewCanvas.height = H;
+const eraserPreviewCtx = eraserPreviewCanvas.getContext("2d");
+
+/* ================= TRANSFORM & LAYOUT ================= */
 const wrapper = document.getElementById("canvas-wrapper");
-
 let transform = { scale: 1, tx: 0, ty: 0 };
-let baseLeft = 0, baseTop = 0, baseSize = 0;
-let k = 1; 
-
-let paths = [], redoStack = [], undoStack = [];
-let drawing = false, erasing = false;
-let currentPath = null, startPos = null;
-let lastTouchPos = null;
-
-let isPinching = false;
-let pinchStartDistance = 0;
-let pinchStartScale = 1;
-let pinchStartMid = { x: 0, y: 0 };
-let pinchStartTx = 0, pinchStartTy = 0;
-
-const $ = id => document.getElementById(id);
-
-function getSegments() {
-  const s = parseInt($("segmentsInput").value);
-  return isNaN(s) ? 12 : Math.max(1, s);
-}
+let baseSize = 0, baseLeft = 0, baseTop = 0;
 
 function layoutCanvas() {
-  const wRect = wrapper.getBoundingClientRect();
-  const w = wrapper.clientWidth;
-  const h = wrapper.clientHeight;
+  const w = wrapper.clientWidth, h = wrapper.clientHeight;
   baseSize = Math.min(w, h);
-  baseLeft = wRect.left + (w - baseSize) / 2;
-  baseTop  = wRect.top  + (h - baseSize) / 2;
-  k = baseSize / CANVAS_W;
-
-  canvas.style.width  = baseSize + "px";
-  canvas.style.height = baseSize + "px";
-  canvas.style.left = (baseSize ? (w - baseSize) / 2 : 0) + "px";
-  canvas.style.top  = (baseSize ? (h - baseSize) / 2 : 0) + "px";
+  baseLeft = (w - baseSize) / 2;
+  baseTop  = (h - baseSize) / 2;
+  [bgCanvas, sceneCanvas, previewCanvas].forEach(c => {
+    c.style.width = baseSize + "px";
+    c.style.height = baseSize + "px";
+    c.style.left = baseLeft + "px";
+    c.style.top = baseTop + "px";
+  });
+  applyTransform();
 }
 
 function applyTransform() {
-  canvas.style.transform =
-    `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`;
+  const t = `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.scale})`;
+  bgCanvas.style.transform = t;
+  sceneCanvas.style.transform = t;
+  previewCanvas.style.transform = t;
 }
 
 function screenToCanvas(clientX, clientY) {
+  const rect = previewCanvas.getBoundingClientRect();
+  const scaleFactor = baseSize / W;
   return {
-    x: (clientX - baseLeft - transform.tx) / (transform.scale * k),
-    y: (clientY - baseTop  - transform.ty) / (transform.scale * k)
+    x: (clientX - rect.left) / (transform.scale * scaleFactor),
+    y: (clientY - rect.top) / (transform.scale * scaleFactor)
   };
 }
 
-/* ================= RENDER ================= */
+window.addEventListener("resize", layoutCanvas);
+window.addEventListener("orientationchange", layoutCanvas);
+layoutCanvas();
 
-function drawGuides() {
-  if (!$("showGuides").checked) return;
-  const segments = getSegments();
-  ctx.save();
-  ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
-  ctx.strokeStyle = "rgba(150,150,150,0.3)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i < segments; i++) {
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, -CANVAS_H);
-    ctx.stroke();
-    ctx.rotate((2 * Math.PI) / segments);
-  }
-  ctx.restore();
+/* ================= ELEMEN UI ================= */
+const colorInput = document.getElementById("color");
+const widthInput = document.getElementById("width");
+const segmentsInput = document.getElementById("segments");
+const brushInput = document.getElementById("brush");
+const reflectionInput = document.getElementById("reflection");
+const fillInput = document.getElementById("fill");
+const guidesInput = document.getElementById("showGuides");
+const toolSelect = document.getElementById("tool");
+const eraserBtn = document.getElementById("eraserBtn");
+
+let selectedTool = "freehand";
+let isEraserMode = false;
+let currentPath = null;
+let isDrawing = false;
+let activePointerId = null;
+
+let undoStack = [];
+let redoStack = [];
+const MAX_HISTORY = 20;
+const MAX_POINTS = 12000;
+
+let textureImage = null;
+
+/* ================= MULTI-TOUCH ================= */
+let isPinching = false;
+let initialPinchDist = 0, initialPinchScale = 1;
+let initialPinchMid = { x: 0, y: 0 };
+let initialPinchTx = 0, initialPinchTy = 0;
+
+function getDistance(t1, t2) {
+  return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+}
+function getMidpoint(t1, t2) {
+  return { x: (t1.clientX + t2.clientX)/2, y: (t1.clientY + t2.clientY)/2 };
 }
 
-function drawShape(p1, p2, path) {
-  const { segments, color, width, brush, fill, tool } = path;
-  const reflectionStyle = path.reflection || "both";
-  const doRotate = reflectionStyle !== "mirror" && reflectionStyle !== "none";
-  const doMirror = reflectionStyle !== "rotate" && reflectionStyle !== "none";
-  const loopCount = doRotate ? segments : 1;
-
-  for (let i = 0; i < loopCount; i++) {
-    const angle = (i * 2 * Math.PI) / segments;
-    ctx.save();
-    ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
-    if (doRotate) ctx.rotate(angle);
-
-    const x1 = p1.x - CANVAS_W / 2, y1 = p1.y - CANVAS_H / 2;
-    const x2 = p2.x - CANVAS_W / 2, y2 = p2.y - CANVAS_H / 2;
-
-    const drawBaseShape = (mirror = false) => {
-      ctx.beginPath();
-      let sx1 = x1, sx2 = x2, sy1 = mirror ? -y1 : y1, sy2 = mirror ? -y2 : y2;
-      let cx = (sx1 + sx2) / 2; let cy = (sy1 + sy2) / 2;
-      let r = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) / 2;
-
-      if (tool === "line") { ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); }
-      else if (tool === "circle") { ctx.arc(cx, cy, r, 0, 2 * Math.PI); }
-      else if (tool === "triangle") { ctx.moveTo(sx1, sy2); ctx.lineTo((sx1 + sx2) / 2, sy1); ctx.lineTo(sx2, sy2); ctx.closePath(); }
-      else if (tool === "rectangle") { ctx.rect(Math.min(sx1, sx2), Math.min(sy1, sy2), Math.abs(sx2 - sx1), Math.abs(sy2 - sy1)); }
-      else if (tool === "square") { const size = Math.min(Math.abs(sx2 - sx1), Math.abs(sy2 - sy1)); ctx.rect(sx1, sy1, size * Math.sign(sx2 - sx1), size * Math.sign(sy2 - sy1)); }
-      else if (tool === "ellipse") { ctx.ellipse(cx, cy, Math.abs(sx2 - sx1) / 2, Math.abs(sy2 - sy1) / 2, 0, 0, 2 * Math.PI); }
-      else if (tool === "star") {
-        const spikes = 5; const outerRadius = r; const innerRadius = r / 2;
-        for (let kk = 0; kk < spikes * 2; kk++) {
-          const a = (kk * Math.PI) / spikes; const radius = kk % 2 === 0 ? outerRadius : innerRadius;
-          const sx = cx + Math.cos(a) * radius; const sy = cy + Math.sin(a) * radius;
-          if (kk === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
-        }
-        ctx.closePath();
-      } else if (tool === "heart") {
-        ctx.moveTo(cx, cy + r / 4);
-        ctx.bezierCurveTo(cx + r, cy - r / 2, cx + r * 1.5, cy + r / 2, cx, cy + r);
-        ctx.bezierCurveTo(cx - r * 1.5, cy + r / 2, cx - r, cy - r / 2, cx, cy + r / 4);
-        ctx.closePath();
-      } else if (tool === "trapezoid") {
-        const topWidth = Math.abs(sx2 - sx1) * 0.5; const bottomWidth = Math.abs(sx2 - sx1);
-        const height = Math.abs(sy2 - sy1);
-        ctx.moveTo(cx - topWidth / 2, cy - height / 2); ctx.lineTo(cx + topWidth / 2, cy - height / 2);
-        ctx.lineTo(cx + bottomWidth / 2, cy + height / 2); ctx.lineTo(cx - bottomWidth / 2, cy + height / 2);
-        ctx.closePath();
-      }
-
-      ctx.globalCompositeOperation = color === "eraser" ? "destination-out" : "source-over";
-      ctx.fillStyle = ctx.strokeStyle = color === "eraser" ? "rgba(0,0,0,1)" : color;
-      ctx.lineWidth = width;
-      ctx.lineCap = "round"; // Ujung membulat
-      ctx.lineJoin = "round"; // Sambungan membulat
-      ctx.shadowBlur = brush === "glow" ? 10 : 0;
-      ctx.shadowColor = color;
-      if (fill) ctx.fill();
-      ctx.stroke();
-    };
-
-    drawBaseShape(false);
-    if (doMirror) drawBaseShape(true);
-    ctx.restore();
+function handlePinchStart(touches) {
+  isPinching = true;
+  if (isDrawing) {
+    isDrawing = false; currentPath = null;
+    previewCtx.clearRect(0, 0, W, H); renderFrame();
   }
+  initialPinchDist = getDistance(touches[0], touches[1]);
+  initialPinchScale = transform.scale;
+  initialPinchMid = getMidpoint(touches[0], touches[1]);
+  initialPinchTx = transform.tx; initialPinchTy = transform.ty;
 }
 
-/* Fungsi baru: Menggambar garis kuas yang halus menggunakan Quadratic Curve */
-function drawSmoothPath(points, color, width, segments, brush, reflectionStyle) {
-  if (points.length < 2) return;
-
-  const doRotate = reflectionStyle !== "mirror" && reflectionStyle !== "none";
-  const doMirror = reflectionStyle !== "rotate" && reflectionStyle !== "none";
-  const loopCount = doRotate ? segments : 1;
-
-  // Siapkan path dasar menggunakan Quadratic Bezier agar melengkung halus
-  const path = new Path2D();
-  const p0 = points[0];
-  path.moveTo(p0.x - CANVAS_W / 2, p0.y - CANVAS_H / 2);
-
-  for (let i = 1; i < points.length - 1; i++) {
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    // titik kontrol di tengah-tengah antara 2 titik
-    const midX = (p1.x + p2.x) / 2 - CANVAS_W / 2;
-    const midY = (p1.y + p2.y) / 2 - CANVAS_H / 2;
-    path.quadraticCurveTo(p1.x - CANVAS_W / 2, p1.y - CANVAS_H / 2, midX, midY);
-  }
-  // Tarik garis ke titik terakhir
-  const pLast = points[points.length - 1];
-  path.lineTo(pLast.x - CANVAS_W / 2, pLast.y - CANVAS_H / 2);
-
-  for (let i = 0; i < loopCount; i++) {
-    const angle = (i * 2 * Math.PI) / segments;
-    ctx.save();
-    ctx.translate(CANVAS_W / 2, CANVAS_H / 2);
-    if (doRotate) ctx.rotate(angle);
-
-    const drawLine = (mirror = false) => {
-      ctx.save();
-      if (mirror) ctx.scale(1, -1); // Efek cermin
-      
-      ctx.globalCompositeOperation = color === "eraser" ? "destination-out" : "source-over";
-      ctx.strokeStyle = color === "eraser" ? "rgba(0,0,0,1)" : color;
-      ctx.lineWidth = width;
-      // Kunci kehalusan garis
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      // Menghindari bertumpuknya alpha di tikungan (membuat warna lebih solid/bersih)
-      ctx.miterLimit = 2; 
-      ctx.shadowBlur = brush === "glow" ? 10 : 0;
-      ctx.shadowColor = color;
-      
-      ctx.stroke(path);
-      ctx.restore();
-    };
-
-    drawLine(false);
-    if (doMirror) drawLine(true);
-    ctx.restore();
-  }
-}
-
-function redrawAll() {
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  for (let path of paths) {
-    if (path.tool === "free") {
-      // Gunakan fungsi smooth yang baru
-      drawSmoothPath(path.points, path.color, path.width, path.segments, path.brush, path.reflection);
-    } else {
-      drawShape(path.points[0], path.points[1], path);
-    }
-  }
-  drawGuides();
-}
-
-/* ================= INPUT HANDLING ================= */
-
-function handleDown(e) {
-  if (isPinching) return;
-  const pos = screenToCanvas(e.clientX, e.clientY);
-  drawing = true;
-  startPos = pos;
-  const tool = $("toolType").value;
-  currentPath = {
-    tool, color: erasing ? "eraser" : $("colorPicker").value,
-    width: parseInt($("lineWidth").value), segments: getSegments(),
-    brush: $("brushType").value, fill: $("fillShape").checked,
-    points: [startPos], reflection: $("reflectionStyle").value
-  };
-}
-
-function handleMove(e) {
-  if (!drawing || isPinching) return;
-  const pos = screenToCanvas(e.clientX, e.clientY);
-  lastTouchPos = { clientX: e.clientX, clientY: e.clientY };
-  
-  if (currentPath.tool === "free") {
-    // Hanya tambahkan titik jika jaraknya lumayan jauh (mencegah titik menumpuk)
-    const lastP = currentPath.points[currentPath.points.length - 1];
-    const dist = Math.hypot(pos.x - lastP.x, pos.y - lastP.y);
-    
-    if (dist > 1.5) { 
-      currentPath.points.push(pos);
-      // Karena penggambaran path smooth lebih efisien, kita redraw saja
-      // (atau jika terasa lag, gambar hanya segmen terakhir)
-      redrawAll(); 
-      drawSmoothPath(currentPath.points, currentPath.color, currentPath.width, currentPath.segments, currentPath.brush, currentPath.reflection);
-    }
-  } else {
-    redrawAll();
-    drawShape(startPos, pos, currentPath);
-    drawGuides();
-  }
-}
-
-function handleUp(e) {
-  if (!drawing || isPinching) { drawing = false; return; }
-  drawing = false;
-  let cx, cy;
-  if (e.changedTouches && e.changedTouches.length) {
-    cx = e.changedTouches[0].clientX;
-    cy = e.changedTouches[0].clientY;
-  } else if (lastTouchPos) {
-    cx = lastTouchPos.clientX;
-    cy = lastTouchPos.clientY;
-  } else {
-    cx = e.clientX; cy = e.clientY;
-  }
-  const endPos = screenToCanvas(cx, cy);
-  
-  if (currentPath.tool !== "free") {
-    currentPath.points.push(endPos);
-  } else {
-    // Pastikan titik terakhir masuk
-    const lastP = currentPath.points[currentPath.points.length - 1];
-    if (Math.hypot(endPos.x - lastP.x, endPos.y - lastP.y) > 1) {
-      currentPath.points.push(endPos);
-    }
-  }
-  
-  paths.push(currentPath);
-  undoStack.push(currentPath);
-  redoStack = [];
-  redrawAll();
-}
-
-/* ================= WHEEL ZOOM (mouse) ================= */
-function handleWheel(e) {
-  e.preventDefault();
-  const zoomIntensity = 0.1;
-  const oldScale = transform.scale;
-  let newScale = oldScale * (e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity);
-  newScale = Math.min(Math.max(newScale, 0.1), 10);
-
-  const p = screenToCanvas(e.clientX, e.clientY);
-  transform.tx = e.clientX - baseLeft - newScale * k * p.x;
-  transform.ty = e.clientY - baseTop  - newScale * k * p.y;
+function handlePinchMove(touches) {
+  const dist = getDistance(touches[0], touches[1]);
+  const currentMid = getMidpoint(touches[0], touches[1]);
+  let newScale = initialPinchScale * (dist / initialPinchDist);
+  newScale = Math.min(Math.max(newScale, 0.5), 300);
+  const deltaX = currentMid.x - initialPinchMid.x;
+  const deltaY = currentMid.y - initialPinchMid.y;
+  const rect = wrapper.getBoundingClientRect();
+  const midX = initialPinchMid.x - rect.left;
+  const midY = initialPinchMid.y - rect.top;
+  const px = (midX - baseLeft - initialPinchTx) / initialPinchScale;
+  const py = (midY - baseTop - initialPinchTy) / initialPinchScale;
+  transform.tx = (midX - baseLeft - px * newScale) + deltaX;
+  transform.ty = (midY - baseTop - py * newScale) + deltaY;
   transform.scale = newScale;
   applyTransform();
 }
 
-/* ================= TOUCH ================= */
+/* ================= TOUCH EVENTS ================= */
+previewCanvas.addEventListener("touchstart", (e) => {
+  if (e.touches.length === 2) { e.preventDefault(); handlePinchStart(e.touches); }
+  else if (e.touches.length === 1 && !isPinching) { e.preventDefault(); handleDown(e.touches[0]); }
+}, { passive: false });
 
-function touchDistance(t1, t2) {
-  return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+previewCanvas.addEventListener("touchmove", (e) => {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    if (!isPinching) handlePinchStart(e.touches);
+    handlePinchMove(e.touches);
+  } else if (e.touches.length === 1 && !isPinching) {
+    e.preventDefault(); handleMove(e.touches[0]);
+  }
+}, { passive: false });
+
+previewCanvas.addEventListener("touchend", (e) => {
+  if (e.touches.length === 0) {
+    if (isPinching) isPinching = false;
+    else handleUp(e.changedTouches[0]);
+  } else if (e.touches.length === 1 && isPinching) {
+    isPinching = false;
+  }
+}, { passive: false });
+
+previewCanvas.addEventListener("touchcancel", () => {
+  isPinching = false;
+  if (isDrawing) finishDrawing();
+});
+
+previewCanvas.addEventListener("mousedown", (e) => {
+  if (e.pointerType === "touch") return;
+  handleDown(e);
+});
+previewCanvas.addEventListener("mousemove", (e) => {
+  if (e.pointerType === "touch") return;
+  if (isDrawing) handleMove(e);
+});
+window.addEventListener("mouseup", (e) => {
+  if (e.pointerType === "touch") return;
+  if (isDrawing) handleUp(e);
+});
+
+previewCanvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const zoomIntensity = 0.1;
+  const oldScale = transform.scale;
+  let newScale = oldScale * (e.deltaY < 0 ? 1 + zoomIntensity : 1 - zoomIntensity);
+  newScale = Math.min(Math.max(newScale, 0.5), 200);
+  const rect = wrapper.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  const px = (mouseX - baseLeft - transform.tx) / oldScale;
+  const py = (mouseY - baseTop - transform.ty) / oldScale;
+  transform.tx = mouseX - baseLeft - px * newScale;
+  transform.ty = mouseY - baseTop - py * newScale;
+  transform.scale = newScale;
+  applyTransform();
+}, { passive: false });
+
+
+/* ================= LOGIKA GAMBAR & PENGHAPUSAN ================= */
+let lastProcessedPointIndex = 0;
+
+function handleDown(e) {
+  if (isDrawing) return;
+  activePointerId = e.identifier || "mouse";
+  const p = screenToCanvas(e.clientX, e.clientY);
+  saveHistory();
+  currentPath = { settings: getSettings(), points: [p, p] };
+  isDrawing = true;
+  lastProcessedPointIndex = 0;
+
+  snapshotCtx.clearRect(0, 0, W, H);
+  snapshotCtx.drawImage(sceneCanvas, 0, 0);
+
+  renderFrame();
 }
-function touchMid(t1, t2) {
+
+function handleMove(e) {
+  if (!isDrawing || !currentPath) return;
+  if (e.identifier && e.identifier !== activePointerId) return;
+  const p = screenToCanvas(e.clientX, e.clientY);
+
+  const points = currentPath.points;
+  const settings = currentPath.settings;
+
+  if (settings.shape === "freehand") {
+    const last = points[points.length - 1];
+    const dx = p.x - last.x, dy = p.y - last.y;
+    if (dx*dx + dy*dy < 0.5) return;
+
+    if (points.length < MAX_POINTS) points.push(p);
+    else points[points.length - 1] = p;
+
+    if (settings.erase) {
+      applyIncrementalEraser();
+    }
+  } else {
+    points[1] = p;
+  }
+
+  renderFrame();
+}
+
+function handleUp() {
+  if (!isDrawing || !currentPath) return;
+  finishDrawing();
+  activePointerId = null;
+}
+
+function applyIncrementalEraser() {
+  const points = currentPath.points;
+  const settings = currentPath.settings;
+  if (points.length < 2) return;
+
+  const slicePoints = points.slice(lastProcessedPointIndex);
+  if (slicePoints.length < 2) return;
+
+  // 1. Hapus di sceneCtx (coretan)
+  sceneCtx.save();
+  sceneCtx.lineCap = "round";
+  sceneCtx.lineJoin = "round";
+  sceneCtx.lineWidth = settings.width;
+  sceneCtx.globalCompositeOperation = "destination-out";
+  sceneCtx.strokeStyle = "rgba(0,0,0,1)";
+  sceneCtx.shadowBlur = 0;
+
+  drawReflected(sceneCtx, settings, function(c) {
+    traceSmoothPath(c, slicePoints);
+    c.stroke();
+  });
+  sceneCtx.restore();
+
+  // 2. Hapus di bgCtx (jika ada gambar galeri)
+  if (textureImage) {
+    bgCtx.save();
+    bgCtx.lineCap = "round";
+    bgCtx.lineJoin = "round";
+    bgCtx.lineWidth = settings.width;
+    bgCtx.globalCompositeOperation = "destination-out";
+    bgCtx.strokeStyle = "rgba(0,0,0,1)";
+    bgCtx.shadowBlur = 0;
+    
+    drawReflected(bgCtx, settings, function(c) {
+      traceSmoothPath(c, slicePoints);
+      c.stroke();
+    });
+    bgCtx.restore();
+  }
+
+  lastProcessedPointIndex = points.length - 1;
+}
+
+function finishDrawing() {
+  if (!isDrawing || !currentPath) return;
+  const path = currentPath;
+  const settings = path.settings;
+
+  if (settings.shape === "freehand") {
+    if (!settings.erase) {
+      drawSmoothPathTo(sceneCtx, path.points, settings);
+    }
+  } else {
+    if (settings.erase && textureImage) {
+      // Hapus bentuk di bgCtx juga
+      bgCtx.save();
+      bgCtx.globalCompositeOperation = "destination-out";
+      bgCtx.fillStyle = "rgba(0,0,0,1)";
+      bgCtx.strokeStyle = "rgba(0,0,0,1)";
+      bgCtx.lineWidth = settings.width;
+      drawReflected(bgCtx, settings, function(c) {
+        traceShape(c, path.points, settings.shape, settings.fill);
+        if (settings.shape === "line" || !settings.fill) c.stroke();
+      });
+      bgCtx.restore();
+    }
+    drawShapeTo(sceneCtx, path.points, settings);
+  }
+
+  currentPath = null;
+  isDrawing = false;
+  previewCtx.clearRect(0, 0, W, H);
+  renderFrame();
+}
+
+/* ================= UI & PENGATURAN ================= */
+toolSelect.addEventListener("change", (e) => {
+  selectedTool = e.target.value;
+});
+
+eraserBtn.addEventListener("click", () => {
+  isEraserMode = !isEraserMode;
+  eraserBtn.classList.toggle("active", isEraserMode);
+  eraserBtn.textContent = isEraserMode ? "✅🧹" : "🧹";
+});
+
+function getSettings() {
   return {
-    x: (t1.clientX + t2.clientX) / 2,
-    y: (t1.clientY + t2.clientY) / 2
+    color: colorInput.value,
+    width: Number(widthInput.value),
+    segments: Number(segmentsInput.value),
+    brush: brushInput.value,
+    reflection: reflectionInput.value,
+    fill: fillInput.checked,
+    shape: selectedTool,
+    erase: isEraserMode
   };
 }
 
-function startPinch(t1, t2) {
-  isPinching = true;
-  if (drawing) { drawing = false; currentPath = null; }
-  pinchStartDistance = touchDistance(t1, t2);
-  pinchStartScale = transform.scale;
-  pinchStartMid = touchMid(t1, t2);
-  pinchStartTx = transform.tx;
-  pinchStartTy = transform.ty;
-}
-
-function handleTouchStart(e) {
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    startPinch(e.touches[0], e.touches[1]);
-  } else if (e.touches.length === 1) {
-    if (isPinching) return;
-    handleDown(e.touches[0]);
-  }
-}
-
-function handleTouchMove(e) {
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    if (!isPinching) { startPinch(e.touches[0], e.touches[1]); return; }
-
-    const t1 = e.touches[0], t2 = e.touches[1];
-    const dist = touchDistance(t1, t2);
-    if (pinchStartDistance === 0) return;
-    const ratio = dist / pinchStartDistance;
-    let newScale = pinchStartScale * ratio;
-    newScale = Math.min(Math.max(newScale, 0.1), 10);
-
-    const mid = touchMid(t1, t2);
-    const px = (pinchStartMid.x - baseLeft - pinchStartTx) / (pinchStartScale * k);
-    const py = (pinchStartMid.y - baseTop  - pinchStartTy) / (pinchStartScale * k);
-
-    transform.tx = mid.x - baseLeft - newScale * k * px;
-    transform.ty = mid.y - baseTop  - newScale * k * py;
-    transform.scale = newScale;
-    applyTransform();
-  } else if (e.touches.length === 1) {
-    if (isPinching) return;
-    e.preventDefault();
-    handleMove(e.touches[0]);
-  }
-}
-
-function handleTouchEnd(e) {
-  if (e.touches.length === 0) {
-    if (isPinching) {
-      isPinching = false;
-      pinchStartDistance = 0;
-      drawing = false;
-      return;
+/* ================= RENDER & GAMBAR ================= */
+function drawReflected(targetCtx, settings, drawFunction) {
+  const n = Math.max(2, settings.segments);
+  const step = (Math.PI * 2) / n;
+  const mode = settings.reflection;
+  targetCtx.save();
+  targetCtx.translate(CX, CY);
+  for (let i = 0; i < n; i++) {
+    targetCtx.save();
+    targetCtx.rotate(i * step);
+    if (mode === "both" || mode === "mirror") {
+      targetCtx.save();
+      targetCtx.scale(1, -1);
+      drawFunction(targetCtx, settings);
+      targetCtx.restore();
     }
-    handleUp(e);
-  } else if (e.touches.length === 1 && isPinching) {
-    isPinching = false;
-    pinchStartDistance = 0;
-  }
-}
-
-/* ================= SETUP INPUT MODE ================= */
-
-function setupInputMode(mode) {
-  const newCanvas = canvas.cloneNode(true);
-  canvas.parentNode.replaceChild(newCanvas, canvas);
-  canvas = newCanvas;
-  ctx = canvas.getContext("2d");
-  canvas.width = CANVAS_W;
-  canvas.height = CANVAS_H;
-
-  layoutCanvas();
-  applyTransform();
-
-  canvas.addEventListener("wheel", handleWheel, { passive: false });
-
-  if (mode === "mouse") {
-    canvas.addEventListener("mousedown", handleDown);
-    canvas.addEventListener("mousemove", (e) => { if (drawing) handleMove(e); });
-    window.addEventListener("mouseup", handleUp);
-  } else {
-    canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
-    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
-    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
-    canvas.addEventListener("touchcancel", handleTouchEnd, { passive: false });
-  }
-
-  redrawAll();
-}
-
-$("inputMode").addEventListener("change", (e) => setupInputMode(e.target.value));
-setupInputMode($("inputMode").value);
-
-/* ================= BUTTONS ================= */
-
-$("undo").onclick = () => { if (paths.length > 0) redoStack.push(paths.pop()); redrawAll(); };
-$("redo").onclick = () => { if (redoStack.length > 0) paths.push(redoStack.pop()); redrawAll(); };
-$("reset").onclick = () => {
-  paths = []; undoStack = []; redoStack = [];
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-  drawGuides();
-};
-
-$("resetZoom").onclick = () => {
-  transform.scale = 1;
-  transform.tx = 0;
-  transform.ty = 0;
-  applyTransform();
-};
-
-$("eraser").onclick = () => {
-  erasing = !erasing;
-  $("eraser").style.background = erasing ? "#ffcccc" : "#fff";
-};
-
-/* ================= SAVE ================= */
-$("save").onclick = () => {
-  const showGuidesWas = $("showGuides").checked;
-  const tmpCanvas = document.createElement("canvas");
-  tmpCanvas.width = CANVAS_W;
-  tmpCanvas.height = CANVAS_H;
-  const tmpCtx = tmpCanvas.getContext("2d", { willReadFrequently: true });
-
-  const realCtx = ctx;
-  ctx = tmpCtx;
-  $("showGuides").checked = false;
-  redrawAll();
-
-  const imgData = tmpCtx.getImageData(0, 0, CANVAS_W, CANVAS_H);
-  const data = imgData.data;
-  let minX = CANVAS_W, minY = CANVAS_H, maxX = 0, maxY = 0;
-  let hasPixels = false;
-
-  for (let y = 0; y < CANVAS_H; y++) {
-    for (let x = 0; x < CANVAS_W; x++) {
-      const alpha = data[(y * CANVAS_W + x) * 4 + 3];
-      if (alpha > 0) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        hasPixels = true;
-      }
+    if (mode === "both" || mode === "rotate" || mode === "none") {
+      drawFunction(targetCtx, settings);
     }
+    targetCtx.restore();
+    if (mode === "none") break;
   }
+  targetCtx.restore();
+}
 
-  ctx = realCtx;
-  $("showGuides").checked = showGuidesWas;
-
-  if (!hasPixels) {
-    alert("Kanvas masih kosong!");
+function traceSmoothPath(targetCtx, points) {
+  if (!points || points.length === 0) return;
+  targetCtx.beginPath();
+  targetCtx.moveTo(points[0].x - CX, points[0].y - CY);
+  if (points.length === 1) {
+    targetCtx.lineTo(points[0].x - CX + 0.01, points[0].y - CY + 0.01);
     return;
   }
+  if (points.length === 2) {
+    targetCtx.lineTo(points[1].x - CX, points[1].y - CY);
+    return;
+  }
+  for (let i = 1; i < points.length - 1; i++) {
+    const p1 = points[i], p2 = points[i + 1];
+    targetCtx.quadraticCurveTo(p1.x - CX, p1.y - CY, (p1.x + p2.x)/2 - CX, (p1.y + p2.y)/2 - CY);
+  }
+  const last = points[points.length - 1];
+  targetCtx.lineTo(last.x - CX, last.y - CY);
+}
 
-  const padding = 20;
-  minX = Math.max(0, minX - padding);
-  minY = Math.max(0, minY - padding);
-  maxX = Math.min(CANVAS_W, maxX + padding);
-  maxY = Math.min(CANVAS_H, maxY + padding);
+function drawSmoothPathTo(targetCtx, points, settings) {
+  if (!points || points.length === 0) return;
+  targetCtx.save();
+  targetCtx.lineCap = "round";
+  targetCtx.lineJoin = "round";
+  targetCtx.lineWidth = settings.width;
 
-  const cropW = maxX - minX;
-  const cropH = maxY - minY;
+  if (settings.erase) {
+    targetCtx.globalCompositeOperation = "destination-out";
+    targetCtx.strokeStyle = "rgba(0,0,0,1)";
+    targetCtx.shadowBlur = 0;
+  } else {
+    targetCtx.globalCompositeOperation = "source-over";
+    targetCtx.strokeStyle = settings.color;
+    if (settings.brush === "glow") {
+      targetCtx.shadowColor = settings.color;
+      targetCtx.shadowBlur = settings.width * 2.5;
+    } else {
+      targetCtx.shadowBlur = 0;
+    }
+  }
 
-  const finalCanvas = document.createElement("canvas");
-  finalCanvas.width = cropW;
-  finalCanvas.height = cropH;
-  const finalCtx = finalCanvas.getContext("2d");
-  finalCtx.drawImage(tmpCanvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+  drawReflected(targetCtx, settings, function(c) {
+    traceSmoothPath(c, points);
+    c.stroke();
+  });
+  targetCtx.restore();
+}
+
+function traceShape(targetCtx, points, shape, filled) {
+  if (!points || points.length < 1) return;
+  const a = points[0], b = points[points.length - 1];
+  const x1 = a.x - CX, y1 = a.y - CY;
+  const x2 = b.x - CX, y2 = b.y - CY;
+  const left = Math.min(x1, x2), right = Math.max(x1, x2);
+  const top = Math.min(y1, y2), bottom = Math.max(y1, y2);
+  const width = right - left, height = bottom - top;
+
+  targetCtx.beginPath();
+  if (shape === "line") { targetCtx.moveTo(x1, y1); targetCtx.lineTo(x2, y2); }
+  else if (shape === "circle") { targetCtx.arc((x1+x2)/2, (y1+y2)/2, Math.sqrt(width*width+height*height)/2, 0, Math.PI*2); }
+  else if (shape === "ellipse") { targetCtx.ellipse((x1+x2)/2, (y1+y2)/2, Math.max(0.5, width/2), Math.max(0.5, height/2), 0, 0, Math.PI*2); }
+  else if (shape === "rectangle" || shape === "square") {
+    let w = width, h = height;
+    if (shape === "square") { const size = Math.max(width, height); w = size; h = size; }
+    targetCtx.rect(left, top, w, h);
+  }
+  else if (shape === "triangle") { targetCtx.moveTo((x1+x2)/2, top); targetCtx.lineTo(right, bottom); targetCtx.lineTo(left, bottom); targetCtx.closePath(); }
+  else if (shape === "star") {
+    const cx = (x1+x2)/2, cy = (y1+y2)/2;
+    const outer = Math.max(1, Math.sqrt(width*width+height*height)/2), inner = outer*0.42;
+    for (let i=0; i<10; i++) {
+      const r = i%2===0 ? outer : inner;
+      const angle = -Math.PI/2 + i*Math.PI/5;
+      const px = cx + Math.cos(angle)*r, py = cy + Math.sin(angle)*r;
+      if (i===0) targetCtx.moveTo(px, py); else targetCtx.lineTo(px, py);
+    }
+    targetCtx.closePath();
+  }
+  else if (shape === "heart") {
+    const cx = (x1+x2)/2, cy = (y1+y2)/2;
+    const w = Math.max(1, width), h = Math.max(1, height);
+    targetCtx.moveTo(cx, cy + h*0.4);
+    targetCtx.bezierCurveTo(cx - w*0.7, cy - h*0.05, cx - w*0.45, cy - h*0.6, cx, cy - h*0.25);
+    targetCtx.bezierCurveTo(cx + w*0.45, cy - h*0.6, cx + w*0.7, cy - h*0.05, cx, cy + h*0.4);
+    targetCtx.closePath();
+  }
+  else if (shape === "trapezoid") {
+    const inset = width*0.22;
+    targetCtx.moveTo(left+inset, top); targetCtx.lineTo(right-inset, top);
+    targetCtx.lineTo(right, bottom); targetCtx.lineTo(left, bottom);
+    targetCtx.closePath();
+  }
+
+  if (filled && shape !== "line") {
+    targetCtx.fill();
+  }
+}
+
+function drawShapeTo(targetCtx, points, settings) {
+  targetCtx.save();
+  targetCtx.lineWidth = settings.width;
+  targetCtx.lineCap = "round";
+  targetCtx.lineJoin = "round";
+
+  if (settings.erase) {
+    targetCtx.globalCompositeOperation = "destination-out";
+    targetCtx.strokeStyle = "rgba(0,0,0,1)";
+    targetCtx.fillStyle = "rgba(0,0,0,1)";
+    targetCtx.shadowBlur = 0;
+  } else {
+    targetCtx.globalCompositeOperation = "source-over";
+    targetCtx.strokeStyle = settings.color;
+    targetCtx.fillStyle = settings.color;
+    if (settings.brush === "glow") {
+      targetCtx.shadowColor = settings.color;
+      targetCtx.shadowBlur = settings.width * 2;
+    } else {
+      targetCtx.shadowBlur = 0;
+    }
+  }
+
+  drawReflected(targetCtx, settings, function(c) {
+    traceShape(c, points, settings.shape, settings.fill);
+    if (settings.shape === "line" || !settings.fill) c.stroke();
+  });
+  targetCtx.restore();
+}
+
+function drawGuides(targetCtx) {
+  if (!guidesInput.checked) return;
+  const n = Number(segmentsInput.value);
+  const step = (Math.PI * 2) / n;
+  targetCtx.save();
+  targetCtx.translate(CX, CY);
+  targetCtx.strokeStyle = "rgba(40,50,70,0.17)";
+  targetCtx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const angle = i * step;
+    targetCtx.beginPath();
+    targetCtx.moveTo(0, 0);
+    targetCtx.lineTo(Math.cos(angle) * W, Math.sin(angle) * H);
+    targetCtx.stroke();
+  }
+  targetCtx.beginPath();
+  targetCtx.arc(0, 0, 5, 0, Math.PI * 2);
+  targetCtx.stroke();
+  targetCtx.restore();
+}
+
+/* ================= PREVIEW (PERBAIKAN VISUAL ERASER) ================= */
+function drawPreview() {
+  previewCtx.clearRect(0, 0, W, H);
+
+  if (currentPath && currentPath.points.length > 0) {
+    const settings = currentPath.settings;
+
+    if (settings.shape !== "freehand") {
+      if (settings.erase) {
+        // 1. Render efek hapusan secara live ke layer tersembunyi
+        eraserPreviewCtx.clearRect(0, 0, W, H);
+        eraserPreviewCtx.drawImage(snapshotCanvas, 0, 0);
+        drawShapeTo(eraserPreviewCtx, currentPath.points, settings);
+
+        // 2. Tampilkan hasil hapusan dan background ke layar
+        previewCtx.save();
+        previewCtx.globalCompositeOperation = "source-over";
+        previewCtx.drawImage(bgCanvas, 0, 0);
+        previewCtx.drawImage(eraserPreviewCanvas, 0, 0);
+        previewCtx.restore();
+
+        // 3. Tampilkan OUTLINE BENTUK ASLI dengan warna merah transparan
+        previewCtx.save();
+        previewCtx.lineWidth = Math.max(1, settings.width); 
+        previewCtx.strokeStyle = "rgba(255, 0, 0, 0.5)"; // Merah transparan
+        previewCtx.fillStyle = "rgba(255, 0, 0, 0.2)"; // Merah pudar
+
+        drawReflected(previewCtx, settings, function(c) {
+          traceShape(c, currentPath.points, settings.shape, settings.fill);
+          c.stroke(); // Selalu gambar outline solid
+          if (settings.fill && settings.shape !== "line") {
+             c.fill(); // Isi bentuk jika checkbox dicentang
+          }
+        });
+        previewCtx.restore();
+
+      } else {
+        drawShapeTo(previewCtx, currentPath.points, settings);
+      }
+    } else if (!settings.erase) {
+      drawSmoothPathTo(previewCtx, currentPath.points, settings);
+    }
+  }
+
+  drawGuides(previewCtx);
+}
+
+function renderFrame() {
+  drawPreview();
+}
+
+/* ================= UNDO/REDO ================= */
+function saveHistory() {
+  try {
+    const combined = document.createElement("canvas");
+    combined.width = W; combined.height = H;
+    const cCtx = combined.getContext("2d");
+    cCtx.drawImage(bgCanvas, 0, 0);
+    cCtx.drawImage(sceneCanvas, 0, 0);
+    
+    undoStack.push(combined.toDataURL("image/png"));
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryButtons();
+  } catch (e) {}
+}
+
+function restoreHistory(dataUrl) {
+  const img = new Image();
+  img.onload = function() {
+    sceneCtx.clearRect(0, 0, W, H);
+    sceneCtx.drawImage(img, 0, 0, W, H);
+    
+    bgCtx.clearRect(0, 0, W, H);
+    textureImage = null; 
+    renderFrame();
+  };
+  img.src = dataUrl;
+}
+
+function updateHistoryButtons() {
+  document.getElementById("undoBtn").disabled = undoStack.length === 0;
+  document.getElementById("redoBtn").disabled = redoStack.length === 0;
+}
+
+document.getElementById("undoBtn").addEventListener("click", () => {
+  if (isDrawing) finishDrawing();
+  if (!undoStack.length) return;
+  
+  const combined = document.createElement("canvas");
+  combined.width = W; combined.height = H;
+  const cCtx = combined.getContext("2d");
+  cCtx.drawImage(bgCanvas, 0, 0);
+  cCtx.drawImage(sceneCanvas, 0, 0);
+  
+  redoStack.push(combined.toDataURL("image/png"));
+  restoreHistory(undoStack.pop());
+  updateHistoryButtons();
+});
+
+document.getElementById("redoBtn").addEventListener("click", () => {
+  if (isDrawing) finishDrawing();
+  if (!redoStack.length) return;
+  
+  const combined = document.createElement("canvas");
+  combined.width = W; combined.height = H;
+  const cCtx = combined.getContext("2d");
+  cCtx.drawImage(bgCanvas, 0, 0);
+  cCtx.drawImage(sceneCanvas, 0, 0);
+  
+  undoStack.push(combined.toDataURL("image/png"));
+  restoreHistory(redoStack.pop());
+  updateHistoryButtons();
+});
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+  if (isDrawing) { isDrawing = false; currentPath = null; }
+  saveHistory();
+  sceneCtx.clearRect(0, 0, W, H);
+  previewCtx.clearRect(0, 0, W, H);
+  renderFrame();
+});
+
+document.getElementById("resetZoomBtn").addEventListener("click", () => {
+  transform = { scale: 1, tx: 0, ty: 0 };
+  applyTransform();
+});
+
+/* ================= SAVE (HASIL TRANSPARAN) ================= */
+document.getElementById("saveBtn").addEventListener("click", function() {
+  if (isDrawing) finishDrawing();
+
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = W; exportCanvas.height = H;
+  const ectx = exportCanvas.getContext("2d");
+
+  if (textureImage) {
+    ectx.drawImage(bgCanvas, 0, 0);
+  }
+  
+  ectx.drawImage(sceneCanvas, 0, 0);
 
   const link = document.createElement("a");
   link.download = "kaleidoscope.png";
-  link.href = finalCanvas.toDataURL("image/png");
+  link.href = exportCanvas.toDataURL("image/png");
   link.click();
+});
 
-  redrawAll();
-};
+/* ================= TEXTURE ================= */
+function drawTextureToLayer() {
+  if (!textureImage) return;
+  const iw = textureImage.naturalWidth || textureImage.width;
+  const ih = textureImage.naturalHeight || textureImage.height;
+  const scale = Math.max(W / iw, H / ih);
+  const dw = iw * scale, dh = ih * scale;
+  const dx = (W - dw)/2, dy = (H - dh)/2;
 
-/* ================= RESIZE ================= */
-
-function onResize() {
-  layoutCanvas();
-  applyTransform();
+  bgCtx.save();
+  bgCtx.clearRect(0, 0, W, H);
+  bgCtx.globalCompositeOperation = "source-over";
+  bgCtx.globalAlpha = 1;
+  bgCtx.drawImage(textureImage, dx, dy, dw, dh);
+  bgCtx.restore();
 }
-window.addEventListener("resize", onResize);
-window.addEventListener("orientationchange", onResize);
-onResize();
-</script>
 
+document.getElementById("importBtn").addEventListener("click", () => {
+  document.getElementById("textureFile").click();
+});
+
+document.getElementById("textureFile").addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      textureImage = img;
+      saveHistory();
+      drawTextureToLayer();
+      renderFrame();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+});
+
+document.getElementById("clearTextureBtn").addEventListener("click", () => {
+  saveHistory();
+  textureImage = null;
+  sceneCtx.clearRect(0, 0, W, H);
+  bgCtx.clearRect(0, 0, W, H);
+  renderFrame();
+});
+
+/* ================= INIT ================= */
+bgCtx.clearRect(0, 0, W, H); 
+sceneCtx.clearRect(0, 0, W, H);
+previewCtx.clearRect(0, 0, W, H);
+renderFrame();
+updateHistoryButtons();
+</script>
 </body>
 </html>
